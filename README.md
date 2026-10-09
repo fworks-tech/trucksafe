@@ -42,6 +42,28 @@ The application then:
 - External API failure handling
 - Automated tests and API contract validation
 
+## Project Status
+
+The project is in the foundation phase. Implementation slides forward in this order: monorepo structure, minimal frontend (form → Zod → mocked response), minimal backend (`POST /api/v1/route-plans` with a mocked route provider), risk engine, then provider adapters behind the OpenAPI contract.
+
+Completed:
+
+- Repository structure
+- Architecture documentation
+- Feature specifications
+- Risk model documentation
+- API and deployment planning
+
+In progress:
+
+- React application setup
+- Django API setup
+- Route planning endpoint
+- Risk engine implementation
+- Routing and weather provider adapters
+- Interactive map visualization
+- Automated test suite
+
 ## Technology Stack
 
 ### Frontend
