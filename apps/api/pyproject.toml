@@ -24,13 +24,13 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["config", "config.*", "risk", "risk.*"]
+include = ["config", "config.*", "risk", "risk.*", "routing", "routing.*"]
 
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
 pythonpath = ["."]
-testpaths = ["risk/tests"]
+testpaths = ["risk/tests", "routing/tests"]
 
 
 [tool.ruff]
