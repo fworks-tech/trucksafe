@@ -30,7 +30,7 @@ include = ["config", "config.*", "risk", "risk.*", "routing", "routing.*"]
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
 pythonpath = ["."]
-testpaths = ["risk/tests", "routing/tests"]
+testpaths = ["config/tests", "risk/tests", "routing/tests"]
 
 
 [tool.ruff]
