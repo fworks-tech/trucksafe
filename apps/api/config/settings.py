@@ -1,15 +1,38 @@
 # apps/api/config/settings.py
 
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-SECRET_KEY = "django-insecure-development-only"
+def _env_flag(name: str, default: bool) -> bool:
+    """
+    Read a boolean setting from the environment.
 
-DEBUG = True
+    An unset or empty variable falls back to default so local development
+    works without an .env file, while a deployed environment can override it.
+    """
+    raw = os.environ.get(name)
 
-ALLOWED_HOSTS: list[str] = []
+    if raw is None or not raw.strip():
+        return default
+
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+SECRET_KEY: str = os.environ.get(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-development-only",
+)
+
+DEBUG: bool = _env_flag("DJANGO_DEBUG", True)
+
+ALLOWED_HOSTS: list[str] = [
+    host.strip()
+    for host in os.environ.get("ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+]
 
 
 INSTALLED_APPS = [
