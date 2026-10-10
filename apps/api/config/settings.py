@@ -2,37 +2,83 @@
 
 import os
 from pathlib import Path
+from typing import Final
+
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+_DEBUG_TRUE_VALUES: Final[frozenset[str]] = frozenset({"1", "true", "yes", "on"})
+_DEBUG_FALSE_VALUES: Final[frozenset[str]] = frozenset({"0", "false", "no", "off"})
 
-def _env_flag(name: str, default: bool) -> bool:
+_DEVELOPMENT_SECRET_KEY: Final[str] = "django-insecure-development-only"
+
+
+def _parse_debug(raw: str | None) -> bool:
     """
-    Read a boolean setting from the environment.
+    Parse DJANGO_DEBUG explicitly instead of coercing with bool().
 
-    An unset or empty variable falls back to default so local development
-    works without an .env file, while a deployed environment can override it.
+    An unset or empty variable falls back to True so local development
+    works without an .env file. Unrecognized values raise ValueError
+    instead of silently becoming False, because bool("false") is True
+    and a typo like "ture" must not flip the security posture quietly.
     """
-    raw = os.environ.get(name)
-
     if raw is None or not raw.strip():
-        return default
+        return True
 
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
+    normalized = raw.strip().lower()
+
+    if normalized in _DEBUG_TRUE_VALUES:
+        return True
+
+    if normalized in _DEBUG_FALSE_VALUES:
+        return False
+
+    raise ValueError(
+        f"Unrecognized DJANGO_DEBUG value: {raw!r}. "
+        "Use one of 1/true/yes/on or 0/false/no/off."
+    )
 
 
-SECRET_KEY: str = os.environ.get(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-development-only",
+def _parse_allowed_hosts(raw: str | None) -> list[str]:
+    """
+    Parse ALLOWED_HOSTS from a comma-separated environment value.
+
+    Surrounding whitespace is trimmed and empty entries are ignored, so
+    values like "example.com, , api.example.com" behave as expected.
+    """
+    if raw is None:
+        return []
+
+    return [host.strip() for host in raw.split(",") if host.strip()]
+
+
+def _resolve_secret_key(*, debug: bool, raw: str | None) -> str:
+    """
+    Resolve the Django secret key from the environment.
+
+    A provided value is always used. Otherwise local development falls
+    back to a documented insecure key, while a production-like run with
+    DEBUG off fails fast instead of booting with a publicly known key.
+    """
+    if raw and raw.strip():
+        return raw
+
+    if not debug:
+        raise ImproperlyConfigured(
+            "DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is false."
+        )
+
+    return _DEVELOPMENT_SECRET_KEY
+
+
+DEBUG: bool = _parse_debug(os.environ.get("DJANGO_DEBUG"))
+
+SECRET_KEY: str = _resolve_secret_key(
+    debug=DEBUG, raw=os.environ.get("DJANGO_SECRET_KEY")
 )
 
-DEBUG: bool = _env_flag("DJANGO_DEBUG", True)
-
-ALLOWED_HOSTS: list[str] = [
-    host.strip()
-    for host in os.environ.get("ALLOWED_HOSTS", "").split(",")
-    if host.strip()
-]
+ALLOWED_HOSTS: list[str] = _parse_allowed_hosts(os.environ.get("ALLOWED_HOSTS"))
 
 
 INSTALLED_APPS = [
