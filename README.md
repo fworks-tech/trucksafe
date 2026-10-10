@@ -53,7 +53,11 @@ The project is being implemented incrementally using vertical slices.
   - 10, 25, and 50-mile intervals
   - Mandatory origin and destination checkpoints
   - Cumulative-distance ETA interpolation along route geometry
-- Boundary-value test suite covering every threshold, load rule, invalid input, checkpoint interval boundary, and destination inclusion (72 passing tests)
+- Unit tests for every threshold, load rule, invalid input, checkpoint interval boundary, and destination inclusion
+- Property-based tests (Hypothesis) for risk monotonicity and checkpoint invariants
+- Settings parsing tests for debug flags, allowed hosts, and the secret-key guard
+
+At the time of this change, the backend test suite contains 114 passing tests.
 
 ### In Progress
 
@@ -245,7 +249,7 @@ No route-planning endpoints are exposed yet; only the Django admin path is regis
 
 ### Environment Variables
 
-`.env.example` documents planned configuration (database, Redis, provider credentials, frontend tokens). None of these values are required to run the current foundation: settings use SQLite defaults and no provider integrations exist.
+`.env.example` documents planned configuration (database, Redis, provider credentials, frontend tokens). Settings now read `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, and `ALLOWED_HOSTS` from the environment with development-only fallbacks: an unrecognized debug value is rejected, and a production-like run with debug off and no secret key fails fast instead of booting with a known key. The database uses SQLite defaults and no provider integrations exist, so no `.env` file is required to run the backend locally.
 
 Never commit `.env` files or private credentials.
 
@@ -586,7 +590,7 @@ During development, mocked provider responses will be used. Mock data must never
 
 ### Implemented
 
-Backend unit tests cover the weather risk engine and checkpoint generation:
+Backend unit and property-based tests cover the weather risk engine and checkpoint generation:
 
 - Every wind, rain, and snow threshold boundary
 - Values immediately below, at, and above every threshold
@@ -598,6 +602,10 @@ Backend unit tests cover the weather risk engine and checkpoint generation:
 - Mandatory origin and destination checkpoints
 - Ordered checkpoints and non-decreasing ETAs
 - Rejection of invalid intervals, durations, coordinates, and naive timestamps
+- Property-based monotonicity of risk against wind speed and load weight
+- Property-based checkpoint ordering, destination inclusion, and non-decreasing ETAs
+
+The risk and routing domain packages currently have 100% test coverage.
 
 Run them with:
 
@@ -613,7 +621,7 @@ python -m pytest --cov=risk
 - Integration tests with mocked routing and weather providers
 - API contract tests against the OpenAPI document
 - Playwright end-to-end tests for the primary user journey
-- Property-based tests (Hypothesis) for ranking and checkpoint invariants
+- Property-based tests (Hypothesis) for route ranking invariants
 
 ---
 

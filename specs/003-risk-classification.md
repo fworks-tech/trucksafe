@@ -57,19 +57,24 @@ Load rules may increase the risk level but must never reduce it.
   "risk_level": "SEVERE",
   "risk_score": 4,
   "risk_reasons": [
-    "wind between 45 and 54 mph"
+    "wind 45-54 mph with load > 30,000 lb"
   ]
 }
 ```
 
+Reasons come from two sources:
+
+- A weather condition name (`wind`, `rain`, or `snow`) for every condition tied at the highest weather severity.
+- A load rule phrase when a load rule applies.
+
 ## Acceptance Criteria
 
-- [ ] Every threshold is covered by tests.
-- [ ] Values immediately below, at, and above thresholds are tested.
-- [ ] The highest weather severity is selected.
-- [ ] Load rules are applied correctly.
-- [ ] Risk never decreases when load weight increases.
-- [ ] Risk never decreases when wind speed increases.
-- [ ] Every result contains a risk level and at least one reason.
-- [ ] Negative weather values are rejected.
-- [ ] The risk engine does not depend on HTTP, Django, or a database.
+- [x] Every threshold is covered by tests.
+- [x] Values immediately below, at, and above thresholds are tested.
+- [x] The highest weather severity is selected.
+- [x] Load rules are applied correctly.
+- [x] Risk never decreases when load weight increases.
+- [x] Risk never decreases when wind speed increases.
+- [x] Every result contains a risk level and at least one reason.
+- [x] Negative weather values are rejected.
+- [x] The risk engine does not depend on HTTP, Django, or a database.

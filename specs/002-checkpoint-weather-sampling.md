@@ -37,12 +37,12 @@ departure_time +
 
 ## Acceptance Criteria
 
-- [ ] Checkpoints are ordered by distance.
-- [ ] Checkpoint distances are non-negative.
-- [ ] Checkpoint ETAs are non-decreasing.
-- [ ] The final route destination is included.
+- [x] Checkpoints are ordered by distance.
+- [x] Checkpoint distances are non-negative.
+- [x] Checkpoint ETAs are non-decreasing.
+- [x] The final route destination is included.
 - [ ] Weather requests use the checkpoint ETA.
 - [ ] Weather values are normalized to the application's internal units.
 - [ ] Malformed weather responses are rejected safely.
 - [ ] Weather provider timeouts are handled without exposing internal errors.
-- [ ] Checkpoint and ETA calculations have unit test coverage.
+- [x] Checkpoint and ETA calculations have unit test coverage.
