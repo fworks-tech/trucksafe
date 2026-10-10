@@ -92,7 +92,7 @@ Example:
   "risk_score": 5,
   "risk_reasons": [
     "wind >= 55 mph",
-    "rain above 1.00 in/hr"
+    "rain"
   ]
 }
 ```
