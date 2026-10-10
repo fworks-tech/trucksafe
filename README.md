@@ -196,6 +196,8 @@ cd trucksafe
 
 ### 2. Create a Virtual Environment
 
+From the repository root:
+
 ```bash
 cd apps/api
 python -m venv .venv
@@ -217,15 +219,17 @@ On Windows PowerShell:
 
 ### 3. Install Backend Dependencies
 
+Run this command from `apps/api`:
+
 ```bash
-cd apps/api
 python -m pip install -e ".[dev]"
 ```
 
 ### 4. Validate the Installation
 
+Run this command from `apps/api`:
+
 ```bash
-cd apps/api
 python manage.py check
 python -m pytest
 ```
@@ -234,8 +238,9 @@ Expected result: Django reports no issues and all tests pass.
 
 ### 5. Run the API (Optional)
 
+Run this command from `apps/api`:
+
 ```bash
-cd apps/api
 python manage.py runserver
 ```
 
@@ -294,7 +299,7 @@ Negative, NaN, and infinite weather values are invalid and must be rejected.
 ### Wind
 
 | Condition | Risk |
-|---|---|
+| --- | --- |
 | `0 <= wind_mph < 25` | Low |
 | `25 <= wind_mph < 35` | Moderate |
 | `35 <= wind_mph < 45` | High |
@@ -304,7 +309,7 @@ Negative, NaN, and infinite weather values are invalid and must be rejected.
 ### Rain
 
 | Condition | Risk |
-|---|---|
+| --- | --- |
 | `0 <= rain_inches_per_hour < 0.10` | Low |
 | `0.10 <= rain_inches_per_hour < 0.25` | Moderate |
 | `0.25 <= rain_inches_per_hour < 0.50` | High |
@@ -314,7 +319,7 @@ Negative, NaN, and infinite weather values are invalid and must be rejected.
 ### Snow
 
 | Condition | Risk |
-|---|---|
+| --- | --- |
 | `0 <= snow_inches_per_hour < 0.5` | Low |
 | `0.5 <= snow_inches_per_hour < 1.0` | Moderate |
 | `1.0 <= snow_inches_per_hour < 2.0` | High |
@@ -342,7 +347,7 @@ Load rules may increase the risk level but must never reduce an existing weather
 Examples:
 
 | Wind | Load | Result |
-|---:|---:|---|
+| ---: | ---: | --- |
 | 55 mph | Any valid load | No Travel |
 | 45 mph | 30,000 lb | Severe |
 | 45 mph | 30,001 lb | No Travel |
@@ -378,7 +383,7 @@ Lower values are preferred for every item in the key.
 Risk scores:
 
 | Risk | Score |
-|---|---:|
+| --- | ---: |
 | Low | 1 |
 | Moderate | 2 |
 | High | 3 |
@@ -459,7 +464,7 @@ The heatmap displays weather-related operational risk along the route corridor.
 The map distinguishes the following states:
 
 | Risk | Suggested Color |
-|---|---|
+| --- | --- |
 | Low | Green |
 | Moderate | Yellow |
 | High | Orange |
@@ -555,7 +560,7 @@ Errors use a consistent envelope:
 ### HTTP Status Codes
 
 | Status | Meaning |
-|---:|---|
+| ---: | --- |
 | `200` | Successful request |
 | `201` | Resource created |
 | `400` | Invalid request |
@@ -588,7 +593,7 @@ During development, mocked provider responses will be used. Mock data must never
 
 ## Testing Strategy
 
-### Implemented
+### Currently Implemented
 
 Backend unit and property-based tests cover the weather risk engine and checkpoint generation:
 
