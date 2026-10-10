@@ -1,0 +1,182 @@
+# ============================================================
+# Environment variables and secrets
+# ============================================================
+
+.env
+.env.*
+!.env.example
+
+*.pem
+*.key
+*.crt
+secrets/
+credentials/
+.local/
+
+
+# ============================================================
+# Python
+# ============================================================
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+*.so
+*.pyd
+
+.python-version
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.conda/
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Type checking and testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.pyre/
+.pytype/
+
+# Ruff
+.ruff_cache/
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+
+# Keep Django migrations tracked.
+# Do not add migrations/ here.
+
+
+# ============================================================
+# Node.js / React / Vite
+# ============================================================
+
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+.yarn-cache/
+.yarn-integrity
+
+# Build outputs
+dist/
+build/
+.vite/
+
+# Test and coverage outputs
+coverage/
+playwright-report/
+test-results/
+
+# Local environment files
+*.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Optional package manager files
+.npmrc.local
+
+
+# ============================================================
+# Frontend environment files
+# ============================================================
+
+apps/web/.env
+apps/web/.env.*
+!apps/web/.env.example
+
+
+# ============================================================
+# Docker
+# ============================================================
+
+docker-compose.override.yml
+.docker/
+docker-data/
+*.pid
+
+
+# ============================================================
+# Infrastructure and Terraform
+# ============================================================
+
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+
+
+# ============================================================
+# IDEs and editors
+# ============================================================
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+.idea/
+*.iml
+
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+
+# ============================================================
+# Operating systems
+# ============================================================
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+.directory
+
+
+# ============================================================
+# Temporary files
+# =================================================
+

@@ -5,7 +5,7 @@
 Install the following tools:
 
 - Node.js 20 or newer
-- Python 3.12 or newer
+- Python 3.11 or newer
 - Docker
 - Docker Compose
 - Git
@@ -88,7 +88,7 @@ Windows:
 Install dependencies:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -e ".[dev]"
 ```
 
 Apply migrations:

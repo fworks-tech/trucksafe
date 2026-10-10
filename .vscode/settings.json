@@ -1,0 +1,12 @@
+{
+    "python.defaultInterpreterPath": "${workspaceFolder}/apps/api/.venv/Scripts/python.exe",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/apps/api"
+    ],
+    "python.analysis.autoSearchPaths": true,
+    "python.analysis.indexing": true,
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "apps/api"
+    ]
+}

@@ -2,7 +2,11 @@
 
 A full-stack web application that helps truck drivers compare route options based on weather conditions, load weight, travel time, and checkpoint-level risk analysis.
 
-The application generates route alternatives, samples weather conditions along each route using estimated arrival times, classifies operational risk, and recommends the safest route according to the defined business rules.
+The application generates route alternatives, samples weather conditions along each route using estimated arrival times, classifies operational risk, and recommends the safest route according to deterministic business rules.
+
+> This project prioritizes correctness, explainability, safety, and maintainability over unnecessary features.
+
+---
 
 ## Overview
 
@@ -12,61 +16,76 @@ The user provides:
 - Destination
 - Departure date and time
 - Load weight
+- Checkpoint interval (10, 25, or 50 miles)
 
 The application then:
 
-1. Generates up to three route options using a routing API.
-2. Creates checkpoints every 10, 25, or 50 miles.
+1. Generates exactly three route options using a routing provider.
+2. Creates checkpoints at a 10, 25, or 50-mile interval along each route.
 3. Calculates the estimated arrival time at each checkpoint.
 4. Retrieves hourly weather forecasts for each checkpoint.
-5. Classifies weather risk based on wind, rain, and snow.
+5. Classifies weather risk using wind, rain, and snow conditions.
 6. Applies truck load restrictions.
-7. Recommends the best route.
-8. Displays routes, checkpoints, risks, ETAs, summaries, and a weather heatmap.
-9. Provides a 0–48 hour forecast slider for the trip corridor.
+7. Compares the three routes.
+8. Recommends the best eligible route.
+9. Displays routes, checkpoints, risks, ETAs, and summaries on a map.
+10. Displays a weather risk heatmap along the trip corridor.
+11. Provides a forecast slider covering offsets from 0 through 48 hours after departure.
 
-## Features
-
-- Interactive route comparison
-- Up to three route alternatives
-- Checkpoint-based weather analysis
-- Wind, rain, and snow risk classification
-- Load-sensitive route restrictions
-- Route recommendation based on risk and travel time
-- Estimated arrival time for every checkpoint
-- Interactive map visualization
-- Weather risk heatmap
-- Forecast timeline from 0 to 48 hours
-- Responsive user interface
-- Input validation on frontend and backend
-- External API failure handling
-- Automated tests and API contract validation
+---
 
 ## Project Status
 
-The project is in the foundation phase. Implementation slides forward in this order: monorepo structure, minimal frontend (form → Zod → mocked response), minimal backend (`POST /api/v1/route-plans` with a mocked route provider), risk engine, then provider adapters behind the OpenAPI contract.
+The project is being implemented incrementally using vertical slices.
 
-Completed:
+### Implemented
 
-- Repository structure
-- Architecture documentation
-- Feature specifications
-- Risk model documentation
-- API and deployment planning
+- Repository and monorepo structure
+- Architecture, API, risk-model, testing, and local-development documentation
+- Feature specifications in `specs/`
+- Django API foundation: project package `config`, settings, root URLs, `manage.py`
+- Framework-independent weather risk engine in `risk/`:
+  - Wind, rain, and snow threshold classification
+  - Load-sensitive risk rules
+  - Risk precedence (highest severity wins)
+  - Rejection of negative, NaN, and infinite values
+- Framework-independent checkpoint generation and ETA calculation in `routing/`:
+  - 10, 25, and 50-mile intervals
+  - Mandatory origin and destination checkpoints
+  - Cumulative-distance ETA interpolation along route geometry
+- Boundary-value test suite covering every threshold, load rule, invalid input, checkpoint interval boundary, and destination inclusion (72 passing tests)
 
-In progress:
+### In Progress
 
-- React application setup
-- Django API setup
-- Route planning endpoint
-- Risk engine implementation
-- Routing and weather provider adapters
-- Interactive map visualization
-- Automated test suite
+- Route recommendation engine and ranking
+- Route-planning API endpoint (`POST /api/v1/route-plans`)
+
+### Planned (Not Implemented Yet)
+
+- Routing and weather provider adapters (mocked provider first)
+- React frontend: form, route cards, map, heatmap, forecast slider
+- OpenAPI contract in `packages/contracts/openapi.yaml`
+- PostgreSQL/PostGIS persistence, Redis caching, Celery tasks
+- Docker, Docker Compose, CI/CD workflows
+- Health and readiness endpoints
+- Integration tests, API contract tests, and Playwright end-to-end tests
+
+**No external routing or weather provider is connected yet.** The backend currently runs on Django defaults with SQLite and needs no external services or credentials.
+
+---
 
 ## Technology Stack
 
-### Frontend
+### Backend (Implemented)
+
+- Python 3.11+
+- Django 4.2.x
+- Django REST Framework (installed and registered; views and serializers not yet implemented)
+- Python dataclasses for framework-independent domain objects
+- pytest, pytest-django, pytest-cov
+- Ruff, mypy
+
+### Frontend (Planned)
 
 - React
 - TypeScript
@@ -77,166 +96,142 @@ In progress:
 - Tailwind CSS
 - Mapbox GL JS
 
-### Backend
+### Data and Infrastructure (Planned)
 
-- Python
-- Django
-- Django REST Framework
-- Pydantic or DRF serializers
-- httpx
-- Celery
+- PostgreSQL with PostGIS
 - Redis
-
-### Data
-
-- PostgreSQL
-- PostGIS
-
-### Testing and Quality
-
-- Vitest
-- React Testing Library
-- Playwright
-- pytest
-- pytest-django
-- Hypothesis
-- Ruff
-- mypy
-- ESLint
-- Prettier
-- OpenAPI validation
-
-### Infrastructure
-
-- Docker
-- Docker Compose
+- Celery
+- Docker and Docker Compose
 - GitHub Actions
-- Terraform
-- AWS or another compatible cloud provider
+
+---
+
+## Architecture Principles
+
+- Domain logic is independent from Django, HTTP clients, and the database.
+- External providers are accessed through adapter interfaces.
+- Provider responses are normalized before entering the domain layer.
+- Risk classification is deterministic and testable.
+- All timestamps are represented in UTC.
+- Units are explicit: miles, mph, inches/hour, pounds, seconds, WGS84 coordinates.
+- Validation occurs at frontend and backend boundaries.
+- Missing weather data is never silently treated as safe weather.
+- Security-sensitive configuration is kept outside source control.
+
+---
 
 ## Repository Structure
 
 ```text
 .
 ├── apps/
-│   ├── api/                 # Django REST API
-│   └── web/                 # React frontend
-├── packages/
-│   └── contracts/           # OpenAPI specification and shared schemas
-├── specs/                   # Feature specifications
-├── docs/                    # Architecture and technical documentation
-├── infra/                   # Docker and infrastructure configuration
-├── scripts/                 # Development and validation scripts
-├── .github/
-│   └── workflows/           # CI/CD workflows
-├── docker-compose.yml
-├── Makefile
-├── README.md
-└── .env.example
+│   ├── api/
+│   │   ├── config/                 # Django project package
+│   │   │   ├── __init__.py
+│   │   │   ├── settings.py
+│   │   │   ├── urls.py
+│   │   │   ├── asgi.py
+│   │   │   └── wsgi.py
+│   │   ├── risk/                   # Weather risk domain (framework-independent)
+│   │   │   ├── apps.py
+│   │   │   ├── engine.py
+│   │   │   ├── rules.py
+│   │   │   ├── schemas.py
+│   │   │   └── tests/
+│   │   ├── routing/                # Checkpoint and ETA domain (framework-independent)
+│   │   ├── manage.py
+│   │   ├── pyproject.toml
+│   │   └── Dockerfile              # Placeholder, not yet configured
+│   └── web/                        # React frontend (planned, currently empty)
+├── docs/                           # Architecture and technical documents
+├── specs/                          # Feature specifications
+├── .env.example
+├── .gitignore
+└── README.md
 ```
+
+The backend intentionally uses flat packages:
+
+```text
+apps/api/config
+apps/api/risk
+apps/api/routing
+```
+
+instead of a duplicated structure such as:
+
+```text
+apps/api/apps/risk
+```
+
+Backend imports follow the same convention:
+
+```python
+from risk.engine import calculate_risk
+```
+
+---
 
 ## Requirements
 
-Before starting the project, install:
-
-- Node.js 20+
-- Python 3.12+
-- Docker and Docker Compose
 - Git
+- Python 3.11 or newer
 
-External API credentials may be required for:
+Not required for the current foundation: Node.js, Docker, PostgreSQL, Redis. They become relevant when the planned frontend and infrastructure are implemented.
 
-- Routing and geocoding
-- Weather forecasting
-- Map rendering
+---
 
 ## Getting Started
 
-### 1. Clone the repository
+### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/<your-account>/<your-repository>.git
-cd <your-repository>
+git clone https://github.com/fworks-tech/trucksafe.git
+cd trucksafe
 ```
 
-### 2. Configure environment variables
-
-Copy the example environment file:
-
-```bash
-cp .env.example .env
-```
-
-Example configuration:
-
-```env
-# Application
-DJANGO_SETTINGS_MODULE=config.settings.development
-DJANGO_SECRET_KEY=change-me
-DJANGO_DEBUG=true
-ALLOWED_HOSTS=localhost,127.0.0.1
-
-# Database
-POSTGRES_DB=truck_routing
-POSTGRES_USER=truck_routing
-POSTGRES_PASSWORD=truck_routing
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-
-# Redis
-REDIS_URL=redis://localhost:6379/0
-
-# Routing provider
-ROUTING_API_BASE_URL=
-ROUTING_API_TOKEN=
-
-# Weather provider
-WEATHER_API_BASE_URL=
-WEATHER_API_TOKEN=
-
-# Frontend
-VITE_API_BASE_URL=http://localhost:8000/api/v1
-VITE_MAP_PUBLIC_TOKEN=
-```
-
-Never commit `.env` files or private API credentials.
-
-### 3. Start infrastructure services
-
-```bash
-docker compose up -d postgres redis
-```
-
-### 4. Install backend dependencies
+### 2. Create a Virtual Environment
 
 ```bash
 cd apps/api
-
 python -m venv .venv
+```
+
+Activate the environment.
+
+On macOS or Linux:
+
+```bash
 source .venv/bin/activate
 ```
 
-On Windows:
+On Windows PowerShell:
 
 ```powershell
-.venv\Scripts\activate
+.\.venv\Scripts\Activate.ps1
 ```
 
-Install dependencies:
+### 3. Install Backend Dependencies
 
 ```bash
-pip install -r requirements.txt
+cd apps/api
+python -m pip install -e ".[dev]"
 ```
 
-Run migrations:
+### 4. Validate the Installation
 
 ```bash
-python manage.py migrate
+cd apps/api
+python manage.py check
+python -m pytest
 ```
 
-Start the Django API:
+Expected result: Django reports no issues and all tests pass.
+
+### 5. Run the API (Optional)
 
 ```bash
+cd apps/api
 python manage.py runserver
 ```
 
@@ -246,115 +241,124 @@ The API will be available at:
 http://localhost:8000
 ```
 
-### 5. Install frontend dependencies
+No route-planning endpoints are exposed yet; only the Django admin path is registered.
 
-In another terminal:
+### Environment Variables
 
-```bash
-cd apps/web
-npm install
-npm run dev
-```
+`.env.example` documents planned configuration (database, Redis, provider credentials, frontend tokens). None of these values are required to run the current foundation: settings use SQLite defaults and no provider integrations exist.
 
-The frontend will be available at:
+Never commit `.env` files or private credentials.
 
-```text
-http://localhost:5173
-```
+---
 
 ## Available Commands
 
-### Frontend
-
-```bash
-npm run dev        # Start the development server
-npm run build      # Type-check and build the application
-npm run preview    # Preview the production build
-npm run test       # Run unit and component tests
-npm run test:watch # Run tests in watch mode
-npm run test:e2e   # Run Playwright end-to-end tests
-npm run lint       # Run ESLint
-npm run format      # Format files with Prettier
-```
-
 ### Backend
 
+Run these commands from `apps/api`:
+
 ```bash
-python manage.py runserver       # Start the development server
-python manage.py migrate         # Apply database migrations
-python manage.py makemigrations  # Create migrations
-pytest                           # Run backend tests
-ruff check .                     # Run Python linting
-ruff format --check .            # Check formatting
-mypy .                           # Run static type checking
+python manage.py runserver        # Start the development server
+python manage.py check            # Run Django system checks
+python manage.py migrate          # Apply database migrations
+python manage.py makemigrations   # Create database migrations
+python -m pytest                  # Run backend tests
+python -m pytest --cov=risk       # Run risk engine tests with coverage
+ruff check .                      # Run Python linting
+ruff format --check .             # Check Python formatting
+mypy .                            # Run static type checking
 ```
+
+### Frontend
+
+Frontend commands are planned. `apps/web` is an empty placeholder directory.
+
+---
 
 ## Risk Classification
 
-Risk is calculated independently at each checkpoint.
+Risk is calculated independently at each route checkpoint.
 
-### Wind
-
-| Condition | Risk |
-|---|---|
-| `< 25 mph` | Low |
-| `25–34 mph` | Moderate |
-| `35–44 mph` | High |
-| `45–54 mph` | Severe |
-| `≥ 55 mph` | No Travel |
-
-### Rain
-
-| Condition | Risk |
-|---|---|
-| `< 0.10 in/hr` | Low |
-| `0.10–0.25 in/hr` | Moderate |
-| `0.25–0.50 in/hr` | High |
-| `0.50–1.00 in/hr` | Severe |
-| `> 1.00 in/hr` | No Travel |
-
-### Snow
-
-| Condition | Risk |
-|---|---|
-| `< 0.5 in/hr` | Low |
-| `0.5–1.0 in/hr` | Moderate |
-| `1.0–2.0 in/hr` | High |
-| `2.0–3.0 in/hr` | Severe |
-| `> 3.0 in/hr` | No Travel |
-
-When multiple weather conditions apply, the highest severity is used:
+Risk levels are ordered as follows:
 
 ```text
 No Travel > Severe > High > Moderate > Low
 ```
 
+Negative, NaN, and infinite weather values are invalid and must be rejected.
+
+### Wind
+
+| Condition | Risk |
+|---|---|
+| `0 <= wind_mph < 25` | Low |
+| `25 <= wind_mph < 35` | Moderate |
+| `35 <= wind_mph < 45` | High |
+| `45 <= wind_mph < 55` | Severe |
+| `wind_mph >= 55` | No Travel |
+
+### Rain
+
+| Condition | Risk |
+|---|---|
+| `0 <= rain_inches_per_hour < 0.10` | Low |
+| `0.10 <= rain_inches_per_hour < 0.25` | Moderate |
+| `0.25 <= rain_inches_per_hour < 0.50` | High |
+| `0.50 <= rain_inches_per_hour <= 1.00` | Severe |
+| `rain_inches_per_hour > 1.00` | No Travel |
+
+### Snow
+
+| Condition | Risk |
+|---|---|
+| `0 <= snow_inches_per_hour < 0.5` | Low |
+| `0.5 <= snow_inches_per_hour < 1.0` | Moderate |
+| `1.0 <= snow_inches_per_hour < 2.0` | High |
+| `2.0 <= snow_inches_per_hour <= 3.0` | Severe |
+| `snow_inches_per_hour > 3.0` | No Travel |
+
+When multiple weather conditions apply at the same checkpoint, the highest severity wins.
+
+For example, if wind is `Moderate`, rain is `High`, and snow is `Low`, the final weather classification is `High`.
+
+---
+
 ## Load Rules
 
-The following load-specific rules are applied after the weather classification:
+Load rules are applied after the independent weather classifications.
 
-- Wind speed of `≥ 55 mph` results in `No Travel` for every load.
-- Wind speed from `45` to `54 mph` with a load greater than `30,000 lb` results in `No Travel`.
-- Wind speed from `35` to `44 mph` with a load greater than `40,000 lb` results in `Severe`.
+- `wind_mph >= 55` results in `No Travel` for every load.
+- `45 <= wind_mph < 55` and `load_weight_lb > 30,000` results in `No Travel`.
+- `35 <= wind_mph < 45` and `load_weight_lb > 40,000` results in `Severe`.
 
-Load rules can increase the risk level but never reduce an existing risk classification.
+Load weight must be finite and greater than or equal to zero.
+
+Load rules may increase the risk level but must never reduce an existing weather risk classification.
+
+Examples:
+
+| Wind | Load | Result |
+|---:|---:|---|
+| 55 mph | Any valid load | No Travel |
+| 45 mph | 30,000 lb | Severe |
+| 45 mph | 30,001 lb | No Travel |
+| 35 mph | 40,000 lb | High |
+| 35 mph | 40,001 lb | Severe |
+
+---
 
 ## Route Recommendation
 
-Routes are ranked using the following priority order:
+Routes are ranked using a deterministic lexicographical comparison in this exact priority order:
 
-1. Fewest severe-weather miles
-2. Fewest high-risk miles
-3. Lowest average risk score
+1. Fewest Severe-risk miles
+2. Fewest High-risk miles
+3. Lowest average risk
 4. Shortest travel time
 
-The recommendation is deterministic and follows a lexicographical comparison of these metrics.
-
-Example:
+The recommendation key is:
 
 ```text
-Route ranking key:
-
 (
   severe_miles,
   high_miles,
@@ -363,27 +367,117 @@ Route ranking key:
 )
 ```
 
+Lower values are preferred for every item in the key.
+
+`No Travel` is the highest risk level. A route containing `No Travel` segments must be clearly flagged in the response and user interface; it must never be silently treated as safe.
+
+Risk scores:
+
+| Risk | Score |
+|---|---:|
+| Low | 1 |
+| Moderate | 2 |
+| High | 3 |
+| Severe | 4 |
+| No Travel | 5 |
+
+> The ranking engine is planned. The priority order above is normative and must be implemented exactly as written.
+
+---
+
 ## Checkpoints and ETA
 
-Checkpoints are generated along the route geometry using the selected interval:
+The user selects one checkpoint interval:
 
 - 10 miles
 - 25 miles
 - 50 miles
 
-The estimated arrival time at a checkpoint is calculated using the route distance and duration:
+Checkpoints are generated along the route geometry using the selected interval.
+
+Each route contains:
+
+- Origin checkpoint
+- Intermediate checkpoints at the selected interval
+- Destination checkpoint
+
+The destination is always included as the final checkpoint, even when the route length is not an exact multiple of the selected interval.
+
+The estimated arrival time at a checkpoint is calculated using cumulative route distance:
 
 ```text
-checkpoint ETA =
-departure time +
-(checkpoint distance / total route distance) × route duration
+checkpoint_eta =
+    departure_at
+    + (checkpoint_distance / total_route_distance)
+    * route_duration
 ```
 
-Weather conditions are retrieved using the checkpoint coordinates and estimated arrival time.
+This calculation assumes a constant average speed. It does not model stops, traffic changes, or future delays unless segment-level duration data is available from the routing provider.
+
+All timestamps use UTC ISO 8601 format:
+
+```text
+2026-10-09T14:00:00Z
+```
+
+Weather conditions are retrieved using:
+
+- Checkpoint latitude
+- Checkpoint longitude
+- Checkpoint estimated arrival time
+
+If weather data is unavailable for a checkpoint, the system returns an explicit unavailable or degraded state. Missing data is never silently converted to `Low` risk.
+
+---
+
+## Weather Forecast Horizon
+
+The forecast horizon covers offsets from:
+
+```text
+0 through 48 hours after departure
+```
+
+The forecast slider accepts only values in the inclusive range:
+
+```text
+0 <= offset_hours <= 48
+```
+
+If a checkpoint ETA falls outside the supported forecast horizon, the checkpoint exposes a weather-data-unavailable state.
+
+---
+
+## Weather Heatmap
+
+The heatmap displays weather-related operational risk along the route corridor.
+
+The map distinguishes the following states:
+
+| Risk | Suggested Color |
+|---|---|
+| Low | Green |
+| Moderate | Yellow |
+| High | Orange |
+| Severe | Red |
+| No Travel | Dark red |
+| Unavailable | Gray |
+
+> The heatmap is planned. It has not been implemented yet.
+
+---
 
 ## API
 
-### Create a route plan
+The API will use versioned endpoints under:
+
+```text
+/api/v1
+```
+
+> The API contract is planned. No route-planning endpoints exist yet. The contract below is defined in [docs/api.md](docs/api.md) and will be implemented in `packages/contracts/openapi.yaml`.
+
+### Create a Route Plan
 
 ```http
 POST /api/v1/route-plans
@@ -401,184 +495,162 @@ Request:
 }
 ```
 
-### Retrieve a route plan
+Validation rules:
+
+- `origin` is required.
+- `destination` is required.
+- `origin` and `destination` must not be identical.
+- `departure_at` must be a valid UTC ISO 8601 timestamp.
+- `load_weight_lb` must be finite and greater than or equal to zero.
+- `checkpoint_interval_miles` must be `10`, `25`, or `50`.
+
+Successful response: `201 Created`.
+
+### Retrieve a Route Plan
 
 ```http
-GET /api/v1/route-plans/{id}
+GET /api/v1/route-plans/{route_plan_id}
 ```
 
-### Retrieve weather grid data
+The response includes the request inputs, the three route alternatives, route geometries, route summaries, checkpoints, checkpoint ETAs, weather observations, risk classifications, the recommendation result, and provider or data availability warnings.
+
+### Retrieve Weather Grid Data
 
 ```http
-GET /api/v1/route-plans/{id}/weather-grid?offset_hours=12
+GET /api/v1/route-plans/{route_plan_id}/weather-grid?offset_hours=12
 ```
 
-The `offset_hours` parameter supports values from `0` to `48`.
+The `offset_hours` parameter supports values from `0` through `48`.
 
-### Health check
+### Health Check
 
 ```http
 GET /api/v1/health
 ```
 
-### Readiness check
+### Readiness Check
 
 ```http
 GET /api/v1/ready
 ```
 
-The complete API contract is available at:
+### Error Format
 
-```text
-packages/contracts/openapi.yaml
+Errors use a consistent envelope:
+
+```json
+{
+  "error": {
+    "code": "INVALID_REQUEST",
+    "message": "The request contains invalid data.",
+    "request_id": "request-id"
+  }
+}
 ```
+
+### HTTP Status Codes
+
+| Status | Meaning |
+|---:|---|
+| `200` | Successful request |
+| `201` | Resource created |
+| `400` | Invalid request |
+| `404` | Resource not found |
+| `422` | Valid request format but invalid domain value |
+| `502` | External provider failure |
+| `503` | Service temporarily unavailable |
+| `500` | Unexpected server error |
+
+---
+
+## Provider Integrations (Planned)
+
+Routing, geocoding, and weather providers will be accessed through adapter interfaces.
+
+Provider adapters will be responsible for:
+
+- Building provider requests
+- Applying connection and read timeouts
+- Retrying transient failures with exponential backoff
+- Normalizing and validating provider responses
+- Mapping provider errors to explicit unavailable or degraded states
+- Supporting mocks in automated tests
+
+The core risk and recommendation engines do not depend on provider-specific response formats.
+
+During development, mocked provider responses will be used. Mock data must never be presented as live weather data in production.
+
+---
 
 ## Testing Strategy
 
-The project uses multiple testing levels.
+### Implemented
 
-### Unit tests
+Backend unit tests cover the weather risk engine and checkpoint generation:
 
-Business logic tests cover:
+- Every wind, rain, and snow threshold boundary
+- Values immediately below, at, and above every threshold
+- Load rule boundaries (`30,000`/`30,001` lb and `40,000`/`40,001` lb)
+- Risk precedence (highest severity wins)
+- Deterministic risk reasons
+- Rejection of negative, NaN, and infinite weather and load values
+- Checkpoint interval boundaries (exact multiples and remainder routes)
+- Mandatory origin and destination checkpoints
+- Ordered checkpoints and non-decreasing ETAs
+- Rejection of invalid intervals, durations, coordinates, and naive timestamps
 
-- Weather thresholds
-- Boundary values
-- Load rules
-- Risk precedence
-- Checkpoint generation
-- ETA calculation
-- Route recommendation
-- Weather normalization
-
-### Integration tests
-
-Integration tests cover:
-
-- Routing provider responses
-- Weather provider responses
-- Provider timeouts
-- Rate limits
-- Invalid external payloads
-- Cache behavior
-- Database persistence
-
-### End-to-end tests
-
-The primary user journey is tested with Playwright:
-
-1. Enter origin and destination.
-2. Select departure date and time.
-3. Enter load weight.
-4. Submit the form.
-5. Verify route alternatives.
-6. Verify the recommended route.
-7. Inspect checkpoints and risk levels.
-8. Change the forecast slider.
-9. Verify the heatmap update.
-
-Run the complete test suite with:
+Run them with:
 
 ```bash
-make test
+cd apps/api
+python -m pytest
+python -m pytest --cov=risk
 ```
+
+### Planned
+
+- Unit tests for route recommendation and ranking
+- Integration tests with mocked routing and weather providers
+- API contract tests against the OpenAPI document
+- Playwright end-to-end tests for the primary user journey
+- Property-based tests (Hypothesis) for ranking and checkpoint invariants
+
+---
 
 ## Security
 
-The application follows these security practices:
-
 - Backend validation for every request
-- Strict CORS configuration
-- Rate limiting for route planning requests
-- HTTPS in deployed environments
 - Secrets stored outside source control
-- Private API credentials kept server-side
+- Private provider credentials kept server-side
 - External provider timeouts and retries
-- Structured error responses
-- No stack traces exposed to clients
-- Dependency and container vulnerability scanning
-- Input size and range limits
-- SSRF protection through an allowlist of external hosts
+- Structured error responses without stack traces
+- Restricted `ALLOWED_HOSTS` in production
+- Rate limiting for route-planning requests (planned)
+- CORS restricted to trusted frontend origins (planned)
 
-For additional information, see:
+Never commit:
 
-```text
-SECURITY.md
-```
+- `.env` files
+- API tokens
+- Private keys
+- Cloud credentials
+- Database passwords
 
-## External API Resilience
+A `SECURITY.md` policy file is planned and does not exist yet.
 
-External API integrations are implemented behind provider interfaces.
-
-This allows the application to:
-
-- Replace a provider without changing domain logic
-- Mock external services during tests
-- Cache routing and weather responses
-- Handle timeouts and temporary failures
-- Validate provider responses before processing
-- Return meaningful partial or service errors
-
-The core risk and recommendation engines do not depend directly on external API clients.
-
-## Development Principles
-
-- Specification-driven development
-- Domain logic isolated from framework code
-- OpenAPI as the API contract
-- Validation at both frontend and backend boundaries
-- Deterministic business rules
-- Small, testable services
-- Explicit units and UTC timestamps
-- Secure-by-default configuration
-- Performance-conscious map rendering
-- Documentation maintained with the implementation
-
-## Definition of Done
-
-A feature is considered complete when:
-
-- Its specification is documented.
-- Acceptance criteria are implemented.
-- API schemas are updated.
-- Unit tests are included.
-- Integration tests are included where needed.
-- End-to-end coverage exists for critical user flows.
-- Error handling is implemented.
-- Security implications are reviewed.
-- Documentation is updated.
-- CI checks pass.
-
-## Deployment
-
-The application can be deployed using separate frontend and backend services.
-
-A production deployment should include:
-
-- React application served through a CDN
-- Django API behind HTTPS
-- Managed PostgreSQL database with PostGIS
-- Managed Redis instance
-- Secret manager
-- Health checks
-- Centralized logs
-- Error monitoring
-- Automated database backups
-
-Deployment configuration is located in:
-
-```text
-infra/
-```
+---
 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
 - [API](docs/api.md)
 - [Local Development](docs/local-development.md)
-- [Deployment](docs/deployment.md)
 - [Risk Model](docs/risk-model.md)
-- [Testing](docs/testing.md)
+- [Testing Strategy](docs/testing.md)
 - [Architecture Decisions](docs/decisions/)
+- [Deployment](docs/deployment.md) — placeholder; content not yet written
+
+---
 
 ## Feature Specifications
 
@@ -591,6 +663,22 @@ The implementation is guided by the specifications in the `specs/` directory:
 - [Map Visualization](specs/005-map-visualization.md)
 - [Weather Heatmap](specs/006-weather-heatmap.md)
 - [Validation and Reliability](specs/007-validation-and-reliability.md)
+
+---
+
+## Development Data
+
+The foundation will use mocked route and weather data while provider integrations are being implemented.
+
+Mocked data is used only for:
+
+- Local development
+- Unit and integration tests
+- Demonstrations without provider credentials
+
+Production code must use provider adapters and must not represent mocked weather data as live weather information.
+
+---
 
 ## License
 
