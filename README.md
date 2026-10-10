@@ -53,8 +53,11 @@ The project is being implemented incrementally using vertical slices.
   - 10, 25, and 50-mile intervals
   - Mandatory origin and destination checkpoints
   - Cumulative-distance ETA interpolation along route geometry
-- Unit tests for every threshold, load rule, invalid input, checkpoint interval boundary, and destination inclusion (81 passing tests)
+- Unit tests for every threshold, load rule, invalid input, checkpoint interval boundary, and destination inclusion
 - Property-based tests (Hypothesis) for risk monotonicity and checkpoint invariants
+- Settings parsing tests for debug flags, allowed hosts, and the secret-key guard
+
+At the time of this change, the backend test suite contains 114 passing tests.
 
 ### In Progress
 
@@ -246,7 +249,7 @@ No route-planning endpoints are exposed yet; only the Django admin path is regis
 
 ### Environment Variables
 
-`.env.example` documents planned configuration (database, Redis, provider credentials, frontend tokens). Settings now read `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, and `ALLOWED_HOSTS` from the environment with development-only fallbacks. The database uses SQLite defaults and no provider integrations exist, so no `.env` file is required to run the backend locally.
+`.env.example` documents planned configuration (database, Redis, provider credentials, frontend tokens). Settings now read `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, and `ALLOWED_HOSTS` from the environment with development-only fallbacks: an unrecognized debug value is rejected, and a production-like run with debug off and no secret key fails fast instead of booting with a known key. The database uses SQLite defaults and no provider integrations exist, so no `.env` file is required to run the backend locally.
 
 Never commit `.env` files or private credentials.
 
@@ -601,6 +604,8 @@ Backend unit and property-based tests cover the weather risk engine and checkpoi
 - Rejection of invalid intervals, durations, coordinates, and naive timestamps
 - Property-based monotonicity of risk against wind speed and load weight
 - Property-based checkpoint ordering, destination inclusion, and non-decreasing ETAs
+
+The risk and routing domain packages currently have 100% test coverage.
 
 Run them with:
 
