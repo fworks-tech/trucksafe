@@ -5,9 +5,12 @@ These tests verify the monotonicity invariants from specs/003 and
 docs/testing.md: risk never decreases as wind speed or load weight
 increases. Discrete unit tests only sample single points, so a regression
 in a classifier boundary could otherwise slip through.
+
+Execution settings are centralized in apps/api/conftest.py so every
+property test runs deterministically under the same profile.
 """
 
-from hypothesis import given, settings
+from hypothesis import given
 from hypothesis import strategies as st
 
 from risk.engine import calculate_risk
@@ -28,7 +31,6 @@ def clear_weather(wind_mph: float) -> WeatherObservation:
     )
 
 
-@settings(max_examples=300, deadline=None)
 @given(wind_mph=WIND_MPH, first_load=LOAD_WEIGHT_LB, second_load=LOAD_WEIGHT_LB)
 def test_risk_never_decreases_as_load_increases(
     wind_mph: float,
@@ -46,7 +48,6 @@ def test_risk_never_decreases_as_load_increases(
     assert heavier_result.level >= lighter_result.level
 
 
-@settings(max_examples=300, deadline=None)
 @given(load_weight_lb=LOAD_WEIGHT_LB, first_wind=WIND_MPH, second_wind=WIND_MPH)
 def test_risk_never_decreases_as_wind_increases(
     load_weight_lb: float,
@@ -64,7 +65,6 @@ def test_risk_never_decreases_as_wind_increases(
     assert faster_result.level >= slower_result.level
 
 
-@settings(max_examples=200, deadline=None)
 @given(wind_mph=WIND_MPH, load_weight_lb=LOAD_WEIGHT_LB)
 def test_result_always_reports_at_least_one_reason(
     wind_mph: float,

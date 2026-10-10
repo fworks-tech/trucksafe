@@ -4,12 +4,15 @@ Property-based tests for checkpoint generation.
 These tests verify the invariants that hold for every valid route, not just
 the hand-picked cases in test_checkpoints.py: ordering, destination
 inclusion, and ETAs that never move backwards.
+
+Execution settings are centralized in apps/api/conftest.py so every
+property test runs deterministically under the same profile.
 """
 
 import math
 from datetime import UTC, datetime, timedelta
 
-from hypothesis import given, settings
+from hypothesis import given
 from hypothesis import strategies as st
 
 from routing.checkpoints import Checkpoint, Coordinate, generate_checkpoints
@@ -47,7 +50,6 @@ def equator_route(distance_miles: float, step_miles: float) -> list[Coordinate]:
     return coordinates
 
 
-@settings(max_examples=200, deadline=None)
 @given(
     total_distance=ROUTE_LENGTH_MILES,
     interval_miles=INTERVAL_MILES,
