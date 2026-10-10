@@ -8,7 +8,7 @@ sampled along the route.
 """
 
 import math
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -219,6 +219,57 @@ def test_checkpoint_coordinate_is_interpolated_along_route() -> None:
     )
 
 
+def test_repeated_vertex_does_not_break_interpolation() -> None:
+    """
+    A repeated coordinate creates a zero-length segment; interpolation must
+    still land on the next vertex instead of dividing by zero.
+    """
+    coordinates = [
+        Coordinate(0.0, 0.0),
+        Coordinate(0.0, 0.0),
+        Coordinate(0.0, 25.0 / MILES_PER_DEGREE_LONGITUDE),
+        Coordinate(0.0, 50.0 / MILES_PER_DEGREE_LONGITUDE),
+    ]
+
+    checkpoints = generate_checkpoints(
+        coordinates,
+        interval_miles=25.0,
+        departure_at=DEPARTURE,
+        duration_seconds=3600.0,
+    )
+
+    assert [round(checkpoint.distance_miles, 6) for checkpoint in checkpoints] == [
+        0.0,
+        25.0,
+        50.0,
+    ]
+    assert math.isclose(
+        checkpoints[1].longitude,
+        25.0 / MILES_PER_DEGREE_LONGITUDE,
+        abs_tol=1e-6,
+    )
+
+
+def test_eta_is_normalized_to_utc() -> None:
+    """
+    A non-UTC departure produces ETAs at the same instant expressed in UTC.
+    """
+    departure = datetime(2026, 10, 9, 14, 0, tzinfo=timezone(timedelta(hours=5)))
+
+    checkpoints = generate_checkpoints(
+        equator_route(100.0, step_miles=25.0),
+        interval_miles=25.0,
+        departure_at=departure,
+        duration_seconds=3600.0,
+    )
+
+    for checkpoint in checkpoints:
+        assert checkpoint.eta.utcoffset() == timedelta(0)
+
+    assert checkpoints[0].eta == departure
+    assert checkpoints[0].eta == datetime(2026, 10, 9, 9, 0, tzinfo=UTC)
+
+
 @pytest.mark.parametrize(
     "interval_miles",
     [15.0, 0.0, -10.0, float("nan"), float("inf")],
@@ -252,6 +303,19 @@ def test_non_positive_or_non_finite_duration_is_rejected(
             interval_miles=25.0,
             departure_at=DEPARTURE,
             duration_seconds=duration_seconds,
+        )
+
+
+def test_non_datetime_departure_is_rejected() -> None:
+    """
+    A non-datetime value must not reach the ETA arithmetic.
+    """
+    with pytest.raises(ValueError, match="departure_at must be a datetime"):
+        generate_checkpoints(
+            equator_route(50.0, step_miles=25.0),
+            interval_miles=25.0,
+            departure_at="2026-10-09T14:00:00Z",  # type: ignore[arg-type]
+            duration_seconds=3600.0,
         )
 
 

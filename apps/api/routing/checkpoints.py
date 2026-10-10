@@ -17,9 +17,10 @@ framework-specific operations. Route geometry is provided by a routing
 provider adapter and normalized before it reaches this module.
 """
 
+from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from math import asin, cos, isfinite, radians, sin, sqrt
 from typing import Final
 
@@ -203,23 +204,20 @@ def _point_at_distance(
     if distance_miles >= cumulative[-1]:
         return coordinates[-1]
 
-    for index in range(len(coordinates) - 1):
-        start_distance = cumulative[index]
-        end_distance = cumulative[index + 1]
+    # cumulative[-1] is greater than the target, so the index after the
+    # match always exists and is strictly greater than the matched index.
+    index = bisect_right(cumulative, distance_miles) - 1
+    start_distance = cumulative[index]
+    end_distance = cumulative[index + 1]
 
-        if start_distance <= distance_miles <= end_distance:
-            if end_distance <= start_distance:
-                return coordinates[index]
+    start = coordinates[index]
+    end = coordinates[index + 1]
+    ratio = (distance_miles - start_distance) / (end_distance - start_distance)
 
-            ratio = (distance_miles - start_distance) / (end_distance - start_distance)
-            start = coordinates[index]
-            end = coordinates[index + 1]
-            return Coordinate(
-                latitude=start.latitude + ratio * (end.latitude - start.latitude),
-                longitude=start.longitude + ratio * (end.longitude - start.longitude),
-            )
-
-    return coordinates[-1]
+    return Coordinate(
+        latitude=start.latitude + ratio * (end.latitude - start.latitude),
+        longitude=start.longitude + ratio * (end.longitude - start.longitude),
+    )
 
 
 def generate_checkpoints(
@@ -251,6 +249,8 @@ def generate_checkpoints(
     _validate_duration(duration_seconds)
     _validate_departure(departure_at)
 
+    departure_utc = departure_at.astimezone(UTC)
+
     if len(coordinates) < 2:
         raise ValueError("coordinates must contain at least two vertices.")
 
@@ -263,17 +263,13 @@ def generate_checkpoints(
     if total_distance <= 0.0:
         raise ValueError("route distance must be greater than zero.")
 
+    # The epsilon keeps a destination that lands within floating point noise
+    # of an interval boundary from producing a duplicate checkpoint.
     distances = [0.0]
     interval_distance = interval_miles
     while interval_distance < total_distance - _DISTANCE_EPSILON_MILES:
         distances.append(interval_distance)
         interval_distance += interval_miles
-
-    while (
-        len(distances) > 1
-        and (total_distance - distances[-1]) < _DISTANCE_EPSILON_MILES
-    ):
-        distances.pop()
 
     distances.append(total_distance)
 
@@ -281,7 +277,7 @@ def generate_checkpoints(
 
     for sequence, distance_miles in enumerate(distances, start=1):
         coordinate = _point_at_distance(coordinates, cumulative, distance_miles)
-        eta = departure_at + timedelta(
+        eta = departure_utc + timedelta(
             seconds=(distance_miles / total_distance) * duration_seconds
         )
         checkpoints.append(
