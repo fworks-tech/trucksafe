@@ -11,7 +11,7 @@ from typing import Any
 from rest_framework import serializers
 
 from routing.checkpoints import Coordinate
-from routing.domain import RouteCheckpoint
+from routing.domain import RecommendationReason, RouteCheckpoint
 
 from .services import Endpoint, PlannedRoutePlan
 
@@ -137,8 +137,21 @@ def build_response(result: PlannedRoutePlan) -> dict[str, Any]:
         "id": result.plan_id,
         "status": "completed",
         "recommended_route_id": result.recommendation.recommended_route_id,
+        "recommendation_reason": _reason_payload(result.recommendation.reason),
         "warnings": list(result.warnings),
         "routes": routes,
+    }
+
+
+def _reason_payload(reason: RecommendationReason | None) -> dict[str, Any] | None:
+    """Render the recommendation explanation, or None when unselected."""
+    if reason is None:
+        return None
+    return {
+        "code": reason.code,
+        "message": reason.message,
+        "ranking_key": list(reason.ranking_key),
+        "criteria": list(reason.criteria),
     }
 
 
