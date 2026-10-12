@@ -14,6 +14,10 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'mobile',
+      use: { ...devices['Pixel 7'] },
+    },
   ],
   // Serves the Vite dev app. The dev proxy forwards /api to the Django
   // backend, which must be running on :8000 (mock providers, no external

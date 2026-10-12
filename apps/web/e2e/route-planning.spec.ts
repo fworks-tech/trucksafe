@@ -75,16 +75,12 @@ test('has no critical accessibility violations on form and result states', async
   page,
 }) => {
   await page.goto('/');
-  const formResults = await new AxeBuilder({ page })
-    .disableRules(['color-contrast'])
-    .analyze();
+  const formResults = await new AxeBuilder({ page }).analyze();
   expect(formResults.violations).toEqual([]);
 
   await fillValidForm(page);
   await page.getByRole('button', { name: /plan route/i }).click();
   await expect(page.getByText('Route alternatives (3)')).toBeVisible();
-  const resultResults = await new AxeBuilder({ page })
-    .disableRules(['color-contrast'])
-    .analyze();
+  const resultResults = await new AxeBuilder({ page }).analyze();
   expect(resultResults.violations).toEqual([]);
 });
