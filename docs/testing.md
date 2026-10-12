@@ -38,7 +38,7 @@ Unit tests should cover:
 - ETA calculation.
 - Route metric aggregation.
 - Route recommendation ordering.
-- Unit conversions.
+- Unit conversions (deferred: mocks already use canonical units, so no conversion path exists yet).
 
 The risk and recommendation engines should be tested without requiring Django, a database, or external APIs.
 
@@ -62,15 +62,15 @@ Test scenarios include:
 - Successful geocoding.
 - Successful route generation.
 - Successful weather forecast.
-- Provider timeout.
-- Provider rate limiting.
+- Provider timeout (deferred: no timeouts yet).
+- Provider rate limiting (deferred).
 - Malformed provider response.
 - Missing weather data.
-- Fewer than three route alternatives.
-- Cache hit.
-- Cache miss.
-- Database failure.
-- Redis failure.
+- Fewer than three route alternatives (deferred: the protocol requires exactly three).
+- Cache hit (deferred: no cache yet).
+- Cache miss (deferred: no cache yet).
+- Database failure (deferred).
+- Redis failure (deferred: no Redis yet).
 
 ## API Tests
 
@@ -84,10 +84,10 @@ API tests should cover:
 - Unsupported checkpoint intervals.
 - Invalid provider payloads.
 - Consistent error responses.
-- Health endpoint.
-- Readiness endpoint.
-- Rate limiting.
-- CORS behavior.
+- Health endpoint (deferred: not implemented).
+- Readiness endpoint (deferred: not implemented).
+- Rate limiting (deferred: not implemented).
+- CORS behavior (deferred: not implemented).
 
 ## Frontend Tests
 

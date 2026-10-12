@@ -25,7 +25,30 @@ Routes must be ranked using this order:
 )
 ```
 
-The route with the smallest ranking key is recommended.
+The route with the smallest ranking key is recommended. Eligible routes
+always rank before ineligible ones, regardless of key; no route is
+recommended when every route is ineligible.
+
+## Recommendation Explanation
+
+The recommended route must include a deterministic, machine-readable
+explanation:
+
+```json
+{
+  "recommended_route_id": "route-1",
+  "recommendation_reason": {
+    "code": "LOWEST_RISK_RANKING",
+    "message": "Selected using the deterministic route ranking criteria.",
+    "ranking_key": [0.0, 10.0, 1.8, 7200.0],
+    "criteria": ["severe_miles", "high_miles", "average_risk_score", "duration_seconds"]
+  }
+}
+```
+
+`ranking_key` is the exact ranking tuple of the selected route.
+When no route is eligible, `recommended_route_id` and
+`recommendation_reason` are both `null` and warnings explain why.
 
 ## Route Metrics
 

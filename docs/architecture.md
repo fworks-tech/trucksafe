@@ -96,29 +96,29 @@ class RoutingProvider:
     def geocode(self, address: str):
         ...
 
-    def get_routes(self, origin, destination):
+    def plan_routes(self, request):
         ...
 
 
 class WeatherProvider:
-    def get_hourly_forecast(
+    def get_weather(
         self,
         latitude: float,
         longitude: float,
-        start_at,
-        end_at,
+        *,
+        valid_time,
     ):
         ...
 ```
 
 Provider adapters are responsible for:
 
-- Authentication.
-- HTTP requests.
-- Timeouts.
-- Retries for transient errors.
+- Authentication (real adapters; mocks use none).
+- HTTP requests (real adapters; mocks perform no I/O).
+- Timeouts (real adapters).
+- Retries for transient errors (bounded immediate retry today; backoff with real adapters).
 - Response validation.
-- Unit conversion.
+- Unit conversion (real adapters; mocks are already canonical).
 - Mapping provider-specific fields to internal models.
 
 ## Internal Units
@@ -138,7 +138,12 @@ The application uses the following canonical units:
 
 ## Persistence
 
-The system may persist:
+The system persists:
+
+- Computed route plans (`route_plans.RoutePlan`, keyed by deterministic
+  plan id; see ADR-004). Only successful plans are stored.
+
+It may later persist:
 
 - Route planning requests.
 - Route alternatives.
@@ -150,15 +155,19 @@ External API responses should be cached to reduce latency and provider usage.
 
 ## Reliability
 
-The application should implement:
+The application implements:
+
+- Retry with bounded attempts for transient failures (no backoff yet).
+- Response schema validation.
+- Structured error responses.
+- Request correlation IDs (valid client ids propagated, else generated).
+
+Still planned:
 
 - Provider timeouts.
-- Retry with exponential backoff for transient failures.
-- Response schema validation.
+- Exponential backoff.
 - Cache expiration.
-- Structured error responses.
 - Health and readiness endpoints.
-- Request correlation IDs.
 
 ## Performance Considerations
 
