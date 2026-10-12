@@ -48,6 +48,14 @@ const geometrySchema = z
   .nullable()
   .catch(null);
 
+const riskSegmentSchema = z.object({
+  start_index: z.number().int().min(0),
+  end_index: z.number().int().min(0),
+  risk_level: riskLevelSchema.nullable().catch(null),
+  risk_score: z.number().min(1).max(5).nullable().catch(null),
+  risk_reasons: z.array(z.string()).catch([]),
+});
+
 const routeSchema = z.object({
   id: z.string(),
   distance_miles: z.number(),
@@ -61,6 +69,7 @@ const routeSchema = z.object({
   average_risk_score: z.number(),
   geometry: geometrySchema,
   checkpoints: z.array(checkpointSchema),
+  risk_segments: z.array(riskSegmentSchema).catch([]),
 });
 
 const recommendationReasonSchema = z.object({

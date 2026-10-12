@@ -44,6 +44,14 @@ export type GeometryPayload = {
   coordinates: Array<[number, number]>;
 };
 
+export interface RiskSegmentPayload {
+  start_index: number;
+  end_index: number;
+  risk_level: RiskLevel | null;
+  risk_score: number | null;
+  risk_reasons: string[];
+}
+
 export interface RoutePayload {
   id: string;
   distance_miles: number;
@@ -57,6 +65,7 @@ export interface RoutePayload {
   average_risk_score: number;
   geometry: GeometryPayload | null;
   checkpoints: CheckpointPayload[];
+  risk_segments?: RiskSegmentPayload[];
 }
 
 export interface RecommendationReasonPayload {

@@ -11,7 +11,7 @@ from typing import Any
 from rest_framework import serializers
 
 from routing.checkpoints import Coordinate
-from routing.domain import RecommendationReason, RouteCheckpoint
+from routing.domain import RecommendationReason, Route, RouteCheckpoint
 
 from .services import Endpoint, PlannedRoutePlan
 
@@ -124,9 +124,15 @@ def build_response(result: PlannedRoutePlan) -> dict[str, Any]:
                 "geometry": {
                     "type": "LineString",
                     "coordinates": [
-                        [point.longitude, point.latitude] for point in geometry.points
+                        [point.longitude, point.latitude]
+                        for point in (
+                            route.enriched_geometry.points
+                            if route.enriched_geometry is not None
+                            else geometry.points
+                        )
                     ],
                 },
+                "risk_segments": _risk_segments_payload(route),
                 "checkpoints": [
                     _checkpoint_payload(sequence, checkpoint)
                     for sequence, checkpoint in enumerate(route.checkpoints, start=1)
@@ -153,6 +159,26 @@ def _reason_payload(reason: RecommendationReason | None) -> dict[str, Any] | Non
         "ranking_key": list(reason.ranking_key),
         "criteria": list(reason.criteria),
     }
+
+
+def _risk_segments_payload(route: Route) -> list[dict[str, Any]]:
+    """Render risk segments for a route, or an empty list when unavailable."""
+    enriched = route.enriched_geometry
+    if enriched is None:
+        return []
+    segments = []
+    for segment in enriched.segments:
+        risk = segment.risk
+        segments.append(
+            {
+                "start_index": segment.start_index,
+                "end_index": segment.end_index,
+                "risk_level": risk.level.name if risk is not None else None,
+                "risk_score": float(risk.score) if risk is not None else None,
+                "risk_reasons": list(risk.reasons) if risk is not None else [],
+            }
+        )
+    return segments
 
 
 def _checkpoint_payload(sequence: int, checkpoint: RouteCheckpoint) -> dict[str, Any]:

@@ -136,4 +136,29 @@ describe('createRoutePlan', () => {
     expect(checkpoint?.weather_available).toBe(false);
     expect(checkpoint?.risk_level).toBeNull();
   });
+
+  it('keeps valid risk segments from the success payload', async () => {
+    setScenario('success');
+    const { data } = await createRoutePlan(REQUEST);
+    const segments = data.routes[0]?.risk_segments ?? [];
+    expect(segments).toHaveLength(2);
+    expect(segments[0]?.start_index).toBe(0);
+    expect(segments[0]?.end_index).toBe(1);
+    expect(segments[0]?.risk_level).toBe('MODERATE');
+  });
+
+  it('degrades an out-of-range segment score to null instead of failing', async () => {
+    setScenario('badSegments');
+    const { data } = await createRoutePlan(REQUEST);
+    const segments = data.routes[0]?.risk_segments ?? [];
+    expect(segments).toHaveLength(1);
+    expect(segments[0]?.risk_score).toBeNull();
+    expect(segments[0]?.risk_level).toBe('LOW');
+  });
+
+  it('accepts payloads that omit risk_segments entirely', async () => {
+    setScenario('noSegments');
+    const { data } = await createRoutePlan(REQUEST);
+    expect(data.routes[0]?.risk_segments).toEqual([]);
+  });
 });

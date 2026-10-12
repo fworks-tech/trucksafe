@@ -38,6 +38,26 @@ async function expectMapRegion(page: Page): Promise<void> {
   });
 }
 
+test('documents segment risk colors in the map legend', async ({ page }) => {
+  await withEmptyBasemap(page);
+  await submitValidPlan(page);
+  await expectMapRegion(page);
+
+  // The legend is the accessible decoder for every map treatment, so the
+  // segment colors drawn on the map are also stated as text.
+  await expect(page.getByText('Segment risk')).toBeVisible();
+  for (const label of [
+    'Segment: Low risk',
+    'Segment: Moderate risk',
+    'Segment: High risk',
+    'Segment: Severe risk',
+    'Segment: No Travel risk',
+    'Segment: risk unavailable',
+  ]) {
+    await expect(page.getByText(label, { exact: true })).toBeVisible();
+  }
+});
+
 test('shows the route map with three selectable alternatives', async ({ page }) => {
   await withEmptyBasemap(page);
   await submitValidPlan(page);

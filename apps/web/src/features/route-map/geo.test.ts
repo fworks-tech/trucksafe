@@ -271,3 +271,155 @@ describe('routeVisualState', () => {
     );
   });
 });
+
+describe('risk_segments normalization', () => {
+  const options = {
+    selectedRouteId: null as string | null,
+    recommendedRouteId: 'route-1',
+  };
+
+  it('extracts contiguous segments with sliced geometry', () => {
+    const plan = makeRoutePlan();
+    const result = normalizePlanMap(plan, options);
+
+    expect(result.segments['route-1']).toBeDefined();
+    const segments = result.segments['route-1']!;
+    expect(segments).toHaveLength(2);
+    expect(segments[0]!.startIndex).toBe(0);
+    expect(segments[0]!.endIndex).toBe(1);
+    expect(segments[0]!.risk).toBe('MODERATE');
+    expect(segments[1]!.risk).toBe('LOW');
+    const line = result.lines.find((entry) => entry.routeId === 'route-1')!;
+    expect(segments[0]!.coordinates).toEqual(line.coordinates.slice(0, 2));
+    expect(segments[1]!.coordinates).toEqual(line.coordinates.slice(1, 3));
+  });
+
+  it('omits segments for routes with mismatched indices', () => {
+    const plan = makeRoutePlan({
+      routes: [
+        makeRoute('route-1', {
+          recommended: true,
+          riskSegments: [
+            {
+              start_index: 0,
+              end_index: 5,
+              risk_level: 'LOW',
+              risk_score: 1,
+              risk_reasons: [],
+            },
+          ],
+        }),
+        makeRoute('route-2'),
+        makeRoute('route-3'),
+      ],
+    });
+    const result = normalizePlanMap(plan, options);
+
+    expect(result.segments['route-1']).toBeUndefined();
+    expect(result.segments['route-2']).toBeDefined();
+  });
+
+  it('omits segments for routes with a gap between intervals', () => {
+    const plan = makeRoutePlan({
+      routes: [
+        makeRoute('route-1', {
+          recommended: true,
+          riskSegments: [
+            {
+              start_index: 0,
+              end_index: 1,
+              risk_level: 'LOW',
+              risk_score: 1,
+              risk_reasons: [],
+            },
+            {
+              start_index: 2,
+              end_index: 2,
+              risk_level: 'HIGH',
+              risk_score: 3,
+              risk_reasons: [],
+            },
+          ],
+        }),
+        makeRoute('route-2'),
+        makeRoute('route-3'),
+      ],
+    });
+    const result = normalizePlanMap(plan, options);
+
+    expect(result.segments['route-1']).toBeUndefined();
+  });
+
+  it('keeps unavailable segment risk as null, never fabricated as Low', () => {
+    const plan = makeRoutePlan({
+      routes: [
+        makeRoute('route-1', {
+          recommended: true,
+          riskSegments: [
+            {
+              start_index: 0,
+              end_index: 1,
+              risk_level: null,
+              risk_score: null,
+              risk_reasons: [],
+            },
+            {
+              start_index: 1,
+              end_index: 2,
+              risk_level: 'LOW',
+              risk_score: 1,
+              risk_reasons: [],
+            },
+          ],
+        }),
+        makeRoute('route-2'),
+        makeRoute('route-3'),
+      ],
+    });
+    const result = normalizePlanMap(plan, options);
+
+    const segments = result.segments['route-1']!;
+    expect(segments[0]!.risk).toBeNull();
+    expect(segments[1]!.risk).toBe('LOW');
+  });
+
+  it('keeps No Travel segment risk', () => {
+    const plan = makeRoutePlan({
+      routes: [
+        makeRoute('route-1', {
+          recommended: true,
+          riskSegments: [
+            {
+              start_index: 0,
+              end_index: 1,
+              risk_level: 'NO_TRAVEL',
+              risk_score: 5,
+              risk_reasons: ['wind >= 55 mph'],
+            },
+            {
+              start_index: 1,
+              end_index: 2,
+              risk_level: 'LOW',
+              risk_score: 1,
+              risk_reasons: [],
+            },
+          ],
+        }),
+        makeRoute('route-2'),
+        makeRoute('route-3'),
+      ],
+    });
+    const result = normalizePlanMap(plan, options);
+
+    expect(result.segments['route-1']![0]!.risk).toBe('NO_TRAVEL');
+  });
+
+  it('omits segments when the payload omits them entirely', () => {
+    const plan = makeRoutePlan({
+      routes: [makeRoute('route-1', { recommended: true, riskSegments: [] })],
+    });
+    const result = normalizePlanMap(plan, options);
+
+    expect(result.segments['route-1']).toBeUndefined();
+  });
+});

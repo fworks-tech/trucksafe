@@ -122,6 +122,35 @@ For every route, calculate:
 
 Risk miles are calculated along route segments between consecutive checkpoints.
 
+## Segment Risk
+
+A segment is the portion of a route between two consecutive
+checkpoints, and it carries the risk of the checkpoint at its end. The
+classification is never recomputed per segment: it is the same
+`calculate_risk` result sampled at the defining checkpoint, so the map
+can never disagree with the route cards.
+
+To let clients color segments without redoing interpolation, the API
+returns `risk_segments` alongside an enriched `geometry`:
+
+- The geometry gains vertices at checkpoint positions (origin and
+  destination always remain the first and last coordinate).
+- Each segment entry names an interval of `geometry.coordinates` with
+  `start_index`/`end_index`, inclusive, in origin to destination order.
+- Slicing `coordinates` between those indices yields exactly the
+  sub-line to draw for that risk level.
+- Unavailable weather leaves `risk_level` and `risk_score` as `null` in
+  both segment and checkpoint form; missing risk is never Low.
+- Validation is all-or-nothing per route. A single out-of-range,
+  overlapping, or gapped interval omits every segment for that route so
+  a partially wrong picture is never shown. Route-level metrics,
+  eligibility, and recommendation are unaffected: they still come from
+  the same checkpoint classifications.
+
+Because segment risk is derived from the same classification as the
+route-level summary, the route cards remain the authoritative fallback
+whenever `risk_segments` is absent.
+
 ## Testing Requirements
 
 The risk engine must test:

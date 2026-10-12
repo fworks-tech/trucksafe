@@ -16,7 +16,13 @@ import {
   type MapLayerMouseEvent,
 } from 'maplibre-gl';
 
-import type { LngLat, MappableCheckpoint, MappableRouteLine, MapBounds } from './geo';
+import type {
+  LngLat,
+  MappableCheckpoint,
+  MappableRouteLine,
+  MappableRouteSegment,
+  MapBounds,
+} from './geo';
 
 const ROUTES_SOURCE = 'trucksafe-routes';
 const CHECKPOINTS_SOURCE = 'trucksafe-checkpoints';
@@ -58,25 +64,16 @@ const LINE_COLORS: Record<RouteLineEntry['state'], string> = {
   'no-travel': '#5c0a14',
 };
 
-const LINE_WIDTHS: Record<RouteLineEntry['state'], number> = {
-  'recommended-selected': 7,
-  recommended: 5,
-  selected: 6,
-  eligible: 3,
-  ineligible: 3,
-  'no-travel': 3,
-};
-
-const LINE_OPACITIES: Record<RouteLineEntry['state'], number> = {
-  'recommended-selected': 1,
-  selected: 1,
-  recommended: 0.95,
-  eligible: 0.7,
-  ineligible: 0.5,
-  'no-travel': 0.85,
-};
-
 const CHECKPOINT_COLORS: Record<string, string> = {
+  LOW: '#1b5e20',
+  MODERATE: '#7a5c00',
+  HIGH: '#8a3c00',
+  SEVERE: '#a31226',
+  NO_TRAVEL: '#5c0a14',
+  unavailable: '#78909c',
+};
+
+const SEGMENT_COLORS: Record<string, string> = {
   LOW: '#1b5e20',
   MODERATE: '#7a5c00',
   HIGH: '#8a3c00',
@@ -99,26 +96,6 @@ export function prefersReducedMotion(): boolean {
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
   );
-}
-
-function matchState<T extends string | number>(
-  mapping: Record<RouteLineEntry['state'], T>,
-): ['match', ['get', string], ...unknown[]] {
-  return [
-    'match',
-    ['get', 'state'],
-    'recommended-selected',
-    mapping['recommended-selected'],
-    'recommended',
-    mapping['recommended'],
-    'selected',
-    mapping['selected'],
-    'ineligible',
-    mapping['ineligible'],
-    'no-travel',
-    mapping['no-travel'],
-    mapping['eligible'],
-  ];
 }
 
 type LineLayer = Extract<AddLayerObject, { type: 'line' }>;
@@ -217,34 +194,126 @@ export class RouteMapAdapter {
   }
 
   /** Replace all route and checkpoint layers for a new response. */
-  setRoutes(routes: RouteLineEntry[], checkpoints: CheckpointEntry[]): void {
-    const routeFeatures = routes.map((route) => ({
-      type: 'Feature' as const,
-      properties: { routeId: route.routeId, state: route.state },
-      geometry: { type: 'LineString' as const, coordinates: route.coordinates },
-    }));
-    this.upsertSource(ROUTES_SOURCE, {
-      type: 'FeatureCollection' as const,
-      features: routeFeatures,
-    });
+  setRoutes(
+    routes: RouteLineEntry[],
+    checkpoints: CheckpointEntry[],
+    segments?: Record<string, MappableRouteSegment[]>,
+  ): void {
+    const hasSegments =
+      segments !== undefined && Object.values(segments).some((segs) => segs.length > 0);
+
+    if (hasSegments) {
+      const segmentFeatures = routes.flatMap((route) => {
+        const routeSegments = segments?.[route.routeId];
+        if (!routeSegments || routeSegments.length === 0) {
+          return [
+            {
+              type: 'Feature' as const,
+              properties: {
+                routeId: route.routeId,
+                riskLevel: 'unavailable',
+                state: route.state,
+              },
+              geometry: {
+                type: 'LineString' as const,
+                coordinates: route.coordinates,
+              },
+            },
+          ];
+        }
+        return routeSegments.map((segment) => ({
+          type: 'Feature' as const,
+          properties: {
+            routeId: route.routeId,
+            riskLevel: segment.risk ?? 'unavailable',
+            state: route.state,
+          },
+          geometry: {
+            type: 'LineString' as const,
+            coordinates: segment.coordinates,
+          },
+        }));
+      });
+      this.upsertSource(ROUTES_SOURCE, {
+        type: 'FeatureCollection' as const,
+        features: segmentFeatures,
+      });
+    } else {
+      const routeFeatures = routes.map((route) => ({
+        type: 'Feature' as const,
+        properties: { routeId: route.routeId, state: route.state },
+        geometry: { type: 'LineString' as const, coordinates: route.coordinates },
+      }));
+      this.upsertSource(ROUTES_SOURCE, {
+        type: 'FeatureCollection' as const,
+        features: routeFeatures,
+      });
+    }
+
     if (!this.layersReady) {
       const lineLayer: AddLayerObject = {
         id: ROUTE_LINES_LAYER,
         type: 'line',
         source: ROUTES_SOURCE,
         paint: {
-          'line-color': asExpression<LinePaint['line-color']>(matchState(LINE_COLORS)),
-          'line-width': asExpression<LinePaint['line-width']>(matchState(LINE_WIDTHS)),
-          'line-opacity': asExpression<LinePaint['line-opacity']>(
-            matchState(LINE_OPACITIES),
-          ),
+          'line-color': asExpression<LinePaint['line-color']>([
+            'match',
+            ['get', 'riskLevel'],
+            ...Object.entries(SEGMENT_COLORS).flat(),
+            ['get', 'state'],
+            ...Object.entries(LINE_COLORS).flat(),
+            '#455a64',
+          ]),
+          'line-width': asExpression<LinePaint['line-width']>([
+            'match',
+            ['get', 'riskLevel'],
+            'NO_TRAVEL',
+            4,
+            'SEVERE',
+            3.5,
+            'HIGH',
+            3,
+            'MODERATE',
+            3,
+            'LOW',
+            3,
+            'unavailable',
+            2,
+            ['get', 'state'],
+            'recommended-selected',
+            7,
+            'recommended',
+            5,
+            'selected',
+            6,
+            3,
+          ]),
+          'line-opacity': asExpression<LinePaint['line-opacity']>([
+            'match',
+            ['get', 'riskLevel'],
+            'NO_TRAVEL',
+            0.9,
+            'unavailable',
+            0.4,
+            ['get', 'state'],
+            'recommended-selected',
+            1,
+            'selected',
+            1,
+            'recommended',
+            0.95,
+            0.7,
+          ]),
           'line-dasharray': asExpression<LinePaint['line-dasharray']>([
             'match',
+            ['get', 'riskLevel'],
+            'NO_TRAVEL',
+            ['literal', [5, 2.5]],
+            'unavailable',
+            ['literal', [2, 2]],
             ['get', 'state'],
             'ineligible',
             ['literal', [2, 2]],
-            'no-travel',
-            ['literal', [5, 2.5]],
             ['literal', [1]],
           ]),
         },

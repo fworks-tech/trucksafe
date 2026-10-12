@@ -118,6 +118,30 @@ export function RouteMapLegend(): React.JSX.Element {
           dashed
           label="No Travel route (dashed dark red, never safe)"
         />
+        <Typography variant="body2" sx={{ pt: 1, fontWeight: 600 }}>
+          Segment risk
+        </Typography>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+          {CHECKPOINT_RISKS.map((level) => (
+            <Box
+              key={`segment-${level}`}
+              sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}
+            >
+              <Box
+                aria-hidden="true"
+                sx={{
+                  width: 24,
+                  borderTop: `3px solid ${checkpointColor(level)}`,
+                }}
+              />
+              <Typography variant="body2">
+                {level === 'unavailable'
+                  ? 'Segment: risk unavailable'
+                  : `Segment: ${RISK_LABELS[level]} risk`}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, pt: 0.5 }}>
           {CHECKPOINT_RISKS.map((level) => (
             <DotSwatch

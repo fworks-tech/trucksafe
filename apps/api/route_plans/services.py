@@ -40,6 +40,11 @@ from routing.domain import (
     RouteCheckpoint,
 )
 from routing.recommendation import recommend_route
+from routing.segments import (
+    EnrichedRouteGeometry,
+    build_segments,
+    enrich_geometry,
+)
 
 T = TypeVar("T")
 
@@ -214,11 +219,41 @@ def _build_route(
         _classify_checkpoint(point, sequence, weather_provider, load_weight_lb)
         for sequence, point in enumerate(sampled, start=1)
     )
+    enriched_geometry = _build_enriched_geometry(geometry.points, checkpoints)
     return Route(
         route_id=route_id,
         distance_miles=geometry.distance_miles,
         duration_seconds=geometry.duration_seconds,
         checkpoints=checkpoints,
+        enriched_geometry=enriched_geometry,
+    )
+
+
+def _build_enriched_geometry(
+    geometry_points: tuple,
+    checkpoints: tuple,
+) -> EnrichedRouteGeometry | None:
+    """Enrich route geometry and build risk segments.
+
+    Returns None when segment construction fails validation; the caller
+    then omits risk_segments and the frontend falls back to route-level
+    coloring.
+    """
+    enriched_points, checkpoint_indices = enrich_geometry(
+        geometry_points,
+        [cp.distance_from_origin_miles for cp in checkpoints],
+    )
+    segments = build_segments(
+        checkpoint_indices,
+        [cp.risk for cp in checkpoints],
+        len(enriched_points),
+    )
+    if segments is None:
+        return None
+    return EnrichedRouteGeometry(
+        points=enriched_points,
+        checkpoint_indices=checkpoint_indices,
+        segments=segments,
     )
 
 
