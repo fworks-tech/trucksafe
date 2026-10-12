@@ -20,6 +20,7 @@ def make_checkpoint(
     distance: float,
     level: RiskLevel = RiskLevel.LOW,
 ) -> RouteCheckpoint:
+    """Build a classified checkpoint at a cumulative distance."""
     return RouteCheckpoint(
         checkpoint_id=checkpoint_id,
         latitude=39.0,
@@ -39,6 +40,7 @@ def make_route(
     route_id: str,
     summary: RouteSummary | None = None,
 ) -> Route:
+    """Build a route carrying an explicit summary."""
     return Route(
         route_id=route_id,
         distance_miles=100.0,
@@ -59,6 +61,7 @@ def make_summary(
     duration_seconds: float = 7200.0,
     is_eligible: bool = True,
 ) -> RouteSummary:
+    """Eligible baseline summary with tunable ranking fields."""
     return RouteSummary(
         severe_miles=severe_miles,
         high_miles=high_miles,
@@ -70,6 +73,7 @@ def make_summary(
 
 
 def test_recommendation_key_order() -> None:
+    """The key orders severe, high, average, duration."""
     route = make_route(
         "route-a",
         make_summary(
@@ -84,6 +88,7 @@ def test_recommendation_key_order() -> None:
 
 
 def test_recommendation_prefers_fewer_severe_miles() -> None:
+    """Severe miles outrank every other criterion."""
     route_a = make_route(
         "route-a",
         make_summary(severe_miles=10.0),
@@ -100,6 +105,7 @@ def test_recommendation_prefers_fewer_severe_miles() -> None:
 
 
 def test_recommendation_uses_high_miles_as_second_tie_breaker() -> None:
+    """High miles decide severe-mile ties."""
     route_a = make_route(
         "route-a",
         make_summary(high_miles=20.0),
@@ -115,6 +121,7 @@ def test_recommendation_uses_high_miles_as_second_tie_breaker() -> None:
 
 
 def test_recommendation_uses_average_score_as_third_tie_breaker() -> None:
+    """Average risk decides ties below high miles."""
     route_a = make_route(
         "route-a",
         make_summary(average_risk_score=2.5),
@@ -130,6 +137,7 @@ def test_recommendation_uses_average_score_as_third_tie_breaker() -> None:
 
 
 def test_recommendation_uses_duration_as_final_tie_breaker() -> None:
+    """Duration only breaks full risk ties."""
     route_a = make_route(
         "route-a",
         make_summary(duration_seconds=9000.0),
@@ -145,6 +153,7 @@ def test_recommendation_uses_duration_as_final_tie_breaker() -> None:
 
 
 def test_ineligible_routes_are_not_recommended() -> None:
+    """Eligibility beats even a perfect risk key."""
     eligible_route = make_route(
         "eligible",
         make_summary(
@@ -168,6 +177,7 @@ def test_ineligible_routes_are_not_recommended() -> None:
 
 
 def test_no_travel_route_is_not_recommended_when_eligible_exists() -> None:
+    """No-Travel routes stay visible but never win over eligible ones."""
     eligible_route = make_route(
         "eligible",
         make_summary(severe_miles=10.0, is_eligible=True),
@@ -192,6 +202,7 @@ def test_no_travel_route_is_not_recommended_when_eligible_exists() -> None:
 
 
 def test_no_route_is_recommended_when_all_routes_are_ineligible() -> None:
+    """Total failure yields None with the flag set."""
     route_a = make_route(
         "route-a",
         make_summary(is_eligible=False),
@@ -209,6 +220,7 @@ def test_no_route_is_recommended_when_all_routes_are_ineligible() -> None:
 
 
 def test_recommendation_is_deterministic_for_equal_routes() -> None:
+    """Repeated ranking is stable."""
     route_a = make_route(
         "route-a",
         make_summary(),
@@ -226,6 +238,7 @@ def test_recommendation_is_deterministic_for_equal_routes() -> None:
 
 
 def test_equal_keys_preserve_input_order() -> None:
+    """Ties keep input order instead of flipping."""
     route_a = make_route("route-a", make_summary())
     route_b = make_route("route-b", make_summary())
 
@@ -236,6 +249,7 @@ def test_equal_keys_preserve_input_order() -> None:
 
 
 def test_recommendation_requires_summaries() -> None:
+    """Unranked routes are a caller error, not a guess."""
     route = make_route("route-without-summary")
 
     with pytest.raises(
@@ -252,6 +266,7 @@ def test_recommendation_requires_summaries() -> None:
 
 
 def test_recommendation_rejects_empty_input() -> None:
+    """Ranking nothing is a caller error."""
     with pytest.raises(
         ValueError,
         match="At least one route",

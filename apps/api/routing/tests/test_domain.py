@@ -13,6 +13,7 @@ from routing.domain import (
 
 
 def make_eta() -> datetime:
+    """Fixed timezone-aware departure used by checkpoint fixtures."""
     return datetime(2026, 10, 10, 14, 0, tzinfo=UTC)
 
 
@@ -23,6 +24,7 @@ def make_checkpoint(
     risk: RiskAssessment | RiskResult | None = None,
     weather_available: bool = True,
 ) -> RouteCheckpoint:
+    """Build a valid checkpoint, overriding only what a test needs."""
     return RouteCheckpoint(
         checkpoint_id=checkpoint_id,
         latitude=39.7392,
@@ -39,6 +41,7 @@ def make_route(
     route_id: str = "route-1",
     summary: RouteSummary | None = None,
 ) -> Route:
+    """Build a valid single-checkpoint route."""
     return Route(
         route_id=route_id,
         distance_miles=100.0,
@@ -49,6 +52,7 @@ def make_route(
 
 
 def test_valid_checkpoint_construction() -> None:
+    """A fully specified checkpoint keeps its risk and availability."""
     assessment = RiskAssessment(
         level=RiskLevel.LOW,
         score=float(RiskLevel.LOW.value),
@@ -63,6 +67,7 @@ def test_valid_checkpoint_construction() -> None:
 
 
 def test_valid_route_construction() -> None:
+    """A fully specified route keeps its totals and starts unsummarized."""
     route = make_route()
 
     assert route.route_id == "route-1"
@@ -73,6 +78,7 @@ def test_valid_route_construction() -> None:
 
 
 def test_checkpoint_accepts_engine_risk_result() -> None:
+    """Checkpoints reuse the risk engine result type directly."""
     result = RiskResult(level=RiskLevel.HIGH, reasons=("wind",))
     checkpoint = make_checkpoint(risk=result, weather_available=True)
 
@@ -80,12 +86,14 @@ def test_checkpoint_accepts_engine_risk_result() -> None:
 
 
 def test_checkpoint_with_weather_but_no_risk_is_allowed() -> None:
+    """Classified-later checkpoints are valid; aggregation marks them ineligible."""
     checkpoint = make_checkpoint(risk=None, weather_available=True)
 
     assert checkpoint.risk is None
 
 
 def test_risk_assessment_stores_level_score_and_reasons() -> None:
+    """Assessments carry level, score, and reasons together."""
     assessment = RiskAssessment(
         level=RiskLevel.HIGH,
         score=RiskLevel.HIGH.value,
@@ -99,21 +107,25 @@ def test_risk_assessment_stores_level_score_and_reasons() -> None:
 
 @pytest.mark.parametrize("bad_score", [float("nan"), float("inf"), -1.0, 0.0, 6.0])
 def test_risk_assessment_rejects_invalid_scores(bad_score: float) -> None:
+    """Non-finite and out-of-range scores cannot enter the domain."""
     with pytest.raises(ValueError, match="risk score"):
         RiskAssessment(level=RiskLevel.LOW, score=bad_score)
 
 
 def test_risk_assessment_rejects_score_level_mismatch() -> None:
+    """Score must equal the level value so miles and average agree."""
     with pytest.raises(ValueError, match="must equal level value"):
         RiskAssessment(level=RiskLevel.LOW, score=5.0)
 
 
 def test_risk_assessment_rejects_non_risk_level() -> None:
+    """Only real RiskLevel members classify risk."""
     with pytest.raises(ValueError, match="RiskLevel"):
         RiskAssessment(level="HIGH", score=3.0)  # type: ignore[arg-type]
 
 
 def test_checkpoint_requires_timezone_aware_eta() -> None:
+    """Naive ETAs are rejected, never silently assumed UTC."""
     with pytest.raises(ValueError, match="timezone-aware"):
         RouteCheckpoint(
             checkpoint_id="checkpoint-1",
@@ -127,17 +139,20 @@ def test_checkpoint_requires_timezone_aware_eta() -> None:
 
 @pytest.mark.parametrize("bad_id", ["", "   "])
 def test_checkpoint_rejects_empty_id(bad_id: str) -> None:
+    """Blank checkpoint ids cannot identify a segment."""
     with pytest.raises(ValueError, match="checkpoint_id must not be empty"):
         make_checkpoint(checkpoint_id=bad_id)
 
 
 @pytest.mark.parametrize("bad_id", ["", "   "])
 def test_route_rejects_empty_id(bad_id: str) -> None:
+    """Blank route ids cannot identify a candidate."""
     with pytest.raises(ValueError, match="route_id must not be empty"):
         make_route(route_id=bad_id)
 
 
 def test_checkpoint_rejects_negative_distance() -> None:
+    """Cumulative distance cannot run backwards past the origin."""
     with pytest.raises(
         ValueError,
         match="cannot be negative",
@@ -153,6 +168,7 @@ def test_checkpoint_rejects_negative_distance() -> None:
 def test_route_rejects_non_finite_or_negative_scalars(
     field: str, bad_value: float
 ) -> None:
+    """Route totals must be usable finite numbers."""
     kwargs = {
         "route_id": "route-1",
         "distance_miles": 100.0,
@@ -172,12 +188,14 @@ def test_route_rejects_non_finite_or_negative_scalars(
     ],
 )
 def test_checkpoint_rejects_non_finite_distance(kwargs: dict) -> None:
+    """NaN/inf distances would corrupt segment math."""
     with pytest.raises(ValueError, match="must be finite"):
         make_checkpoint(**kwargs)  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize("bad_value", [float("nan"), float("inf")])
 def test_checkpoint_rejects_non_finite_coordinates(bad_value: float) -> None:
+    """Coordinates must be real numbers."""
     with pytest.raises(ValueError, match="must be finite"):
         RouteCheckpoint(
             checkpoint_id="checkpoint-1",
@@ -196,6 +214,7 @@ def test_checkpoint_rejects_non_finite_coordinates(bad_value: float) -> None:
 def test_checkpoint_rejects_out_of_range_coordinates(
     latitude: float, longitude: float
 ) -> None:
+    """Coordinates must lie within WGS84 bounds."""
     with pytest.raises(ValueError, match="latitude|longitude"):
         RouteCheckpoint(
             checkpoint_id="checkpoint-1",
@@ -208,6 +227,7 @@ def test_checkpoint_rejects_out_of_range_coordinates(
 
 
 def test_checkpoint_without_weather_cannot_have_risk() -> None:
+    """Risk without observations is a contradiction, not Low risk."""
     assessment = RiskAssessment(
         level=RiskLevel.LOW,
         score=RiskLevel.LOW.value,
@@ -224,11 +244,13 @@ def test_checkpoint_without_weather_cannot_have_risk() -> None:
 
 
 def test_checkpoint_rejects_unknown_risk_type() -> None:
+    """Only engine-compatible risk types attach to checkpoints."""
     with pytest.raises(ValueError, match="RiskAssessment or RiskResult"):
         make_checkpoint(risk="LOW", weather_available=True)  # type: ignore[arg-type]
 
 
 def test_route_requires_at_least_one_checkpoint() -> None:
+    """A route with no checkpoints has no segments to score."""
     with pytest.raises(
         ValueError,
         match="at least one checkpoint",
@@ -242,6 +264,7 @@ def test_route_requires_at_least_one_checkpoint() -> None:
 
 
 def test_route_rejects_non_monotonic_checkpoints() -> None:
+    """Decreasing distances would yield negative segments."""
     with pytest.raises(ValueError, match="monotonically increasing"):
         Route(
             route_id="route-1",
@@ -255,6 +278,7 @@ def test_route_rejects_non_monotonic_checkpoints() -> None:
 
 
 def test_route_allows_equal_consecutive_distances() -> None:
+    """Zero-length segments are valid and contribute zero miles."""
     route = Route(
         route_id="route-1",
         distance_miles=100.0,
@@ -279,6 +303,7 @@ def test_route_allows_equal_consecutive_distances() -> None:
     ],
 )
 def test_summary_rejects_non_finite_values(field: str) -> None:
+    """Summaries must hold usable finite metrics."""
     kwargs = {
         "severe_miles": 0.0,
         "high_miles": 0.0,
@@ -293,6 +318,7 @@ def test_summary_rejects_non_finite_values(field: str) -> None:
 
 
 def test_route_with_summary_returns_new_route() -> None:
+    """Summarizing copies the frozen route instead of mutating it."""
     route = make_route()
 
     summary = RouteSummary(
@@ -314,6 +340,7 @@ def test_route_with_summary_returns_new_route() -> None:
 
 
 def test_recommendation_result_reports_recommendation() -> None:
+    """A selected route id reads as a recommendation."""
     result = RecommendationResult(
         recommended_route_id="route-1",
         ranked_route_ids=("route-1", "route-2"),
@@ -324,6 +351,7 @@ def test_recommendation_result_reports_recommendation() -> None:
 
 
 def test_recommendation_result_reports_no_recommendation() -> None:
+    """None reads as no recommendation when all routes fail."""
     result = RecommendationResult(
         recommended_route_id=None,
         ranked_route_ids=("route-1",),

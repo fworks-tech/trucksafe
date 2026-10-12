@@ -31,6 +31,7 @@ class RiskAssessment:
     reasons: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        """Enforce that score equals the RiskLevel numeric value."""
         if not isinstance(self.level, RiskLevel):
             raise ValueError(f"risk level must be a RiskLevel: {self.level!r}")
         if not isfinite(self.score):
@@ -46,12 +47,18 @@ class RiskAssessment:
 class RouteCheckpoint:
     """A checkpoint along a route.
 
-    `distance_from_origin_miles` is cumulative distance from the route
-    origin in miles. The risk at a checkpoint applies to the segment
-    ending at that checkpoint.
-
-    A checkpoint with `weather_available=False` must have `risk=None`;
-    it contributes zero risk miles and makes the route ineligible.
+    Attributes:
+        checkpoint_id: Stable non-blank identifier.
+        latitude: WGS84 latitude in decimal degrees (-90 to 90).
+        longitude: WGS84 longitude in decimal degrees (-180 to 180).
+        distance_from_origin_miles: Cumulative distance from the route
+            origin in miles. The risk at a checkpoint applies to the
+            segment ending at that checkpoint.
+        eta: Timezone-aware estimated arrival time (UTC internally).
+        risk: Classified risk, or None when weather is unavailable or
+            not yet classified.
+        weather_available: False means the segment contributes zero risk
+            miles and the route is ineligible -- never treated as Low.
     """
 
     checkpoint_id: str
@@ -63,6 +70,7 @@ class RouteCheckpoint:
     weather_available: bool = False
 
     def __post_init__(self) -> None:
+        """Enforce ids, tz-aware ETA, finite WGS84 numerics, and consistency."""
         if not self.checkpoint_id.strip():
             raise ValueError("checkpoint_id must not be empty")
         if not isinstance(self.eta, datetime):
@@ -98,10 +106,17 @@ class RouteCheckpoint:
 class RouteSummary:
     """Aggregated route-level risk and duration metrics.
 
-    All mileage fields are in miles; duration is in seconds.
-    Mileage summaries are rounded to 6 decimals to avoid float noise.
-    `average_risk_score` is 0.0 when no checkpoint has a usable
-    classification (outside the valid 1-5 score range, i.e. "no data").
+    Attributes:
+        severe_miles: Miles whose segment risk is Severe.
+        high_miles: Miles whose segment risk is High.
+        no_travel_miles: Miles whose segment risk is No Travel.
+        average_risk_score: Unweighted mean of usable checkpoint scores;
+            0.0 when none exists (outside 1-5, i.e. "no data").
+        duration_seconds: Total route duration in seconds.
+        is_eligible: False when weather is missing anywhere, a usable
+            classification is missing, or any segment is No Travel.
+
+    All mileage fields are in miles and rounded to 6 decimals.
     """
 
     severe_miles: float
@@ -112,6 +127,7 @@ class RouteSummary:
     is_eligible: bool
 
     def __post_init__(self) -> None:
+        """Enforce finite non-negative summary metrics."""
         for name, value in (
             ("severe_miles", self.severe_miles),
             ("high_miles", self.high_miles),
@@ -129,7 +145,13 @@ class RouteSummary:
 class Route:
     """A candidate route.
 
-    The summary is populated after checkpoint risks are aggregated.
+    Attributes:
+        route_id: Stable non-blank identifier.
+        distance_miles: Total route distance in miles.
+        duration_seconds: Total travel time in seconds.
+        checkpoints: Ordered checkpoints (distances non-decreasing).
+        summary: Populated by aggregation; None until then.
+
     Checkpoint distances must be monotonically non-decreasing
     (each distance >= the previous one).
     """
@@ -141,6 +163,7 @@ class Route:
     summary: RouteSummary | None = None
 
     def __post_init__(self) -> None:
+        """Enforce id, finite non-negative totals, and ordered checkpoints."""
         if not self.route_id.strip():
             raise ValueError("route_id must not be empty")
         for name, value in (
@@ -172,7 +195,12 @@ class Route:
 class RecommendationResult:
     """Result of deterministic route recommendation.
 
-    `recommended_route_id` is None when no route is eligible.
+    Attributes:
+        recommended_route_id: Best eligible route, or None when every
+            route is ineligible.
+        ranked_route_ids: All route ids, eligible first, each group in
+            ranking-key order (stable input order on ties).
+        all_routes_ineligible: True when no route was recommendable.
     """
 
     recommended_route_id: str | None

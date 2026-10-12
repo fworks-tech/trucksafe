@@ -14,6 +14,8 @@ from risk.schemas import RiskLevel, RiskResult
 
 from .domain import RiskAssessment, Route, RouteCheckpoint, RouteSummary
 
+#: Checkpoint risk accepted by aggregation: the local assessment type or
+#: the risk engine result (both expose `.level` and `.score`).
 CheckpointRisk = RiskAssessment | RiskResult
 
 

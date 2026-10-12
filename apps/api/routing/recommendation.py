@@ -10,6 +10,8 @@ from collections.abc import Iterable
 
 from .domain import RecommendationResult, Route, RouteSummary
 
+#: Ranking key in priority order: severe miles, high miles, average risk,
+#: duration. Lower wins every field.
 RecommendationKey = tuple[float, float, float, float]
 
 

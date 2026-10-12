@@ -15,6 +15,7 @@ from routing.domain import (
 
 
 def make_eta() -> datetime:
+    """Fixed timezone-aware departure used by checkpoint fixtures."""
     return datetime(2026, 10, 10, 14, 0, tzinfo=UTC)
 
 
@@ -23,6 +24,7 @@ def make_risk(
     *,
     reasons: tuple[str, ...] = ("test reason",),
 ) -> RiskAssessment:
+    """Risk assessment at the given level with a test reason."""
     return RiskAssessment(
         level=level,
         score=float(level.value),
@@ -37,6 +39,7 @@ def make_checkpoint(
     level: RiskLevel | None = None,
     weather_available: bool = True,
 ) -> RouteCheckpoint:
+    """Build a classified checkpoint at a cumulative distance."""
     risk = make_risk(level) if level is not None else None
 
     return RouteCheckpoint(
@@ -55,6 +58,7 @@ def make_route(
     *,
     duration_seconds: float = 7200.0,
 ) -> Route:
+    """Build a route from explicit checkpoints."""
     return Route(
         route_id="route-1",
         distance_miles=100.0,
@@ -64,6 +68,7 @@ def make_route(
 
 
 def test_aggregate_route_summary_calculates_risk_miles() -> None:
+    """Each checkpoint risk colors the segment ending at it."""
     route = make_route(
         (
             make_checkpoint("origin", 0.0, level=RiskLevel.LOW),
@@ -84,6 +89,7 @@ def test_aggregate_route_summary_calculates_risk_miles() -> None:
 
 
 def test_all_low_route_is_eligible() -> None:
+    """Clean routes stay eligible with zero risk miles."""
     route = make_route(
         (
             make_checkpoint("origin", 0.0, level=RiskLevel.LOW),
@@ -101,6 +107,7 @@ def test_all_low_route_is_eligible() -> None:
 
 
 def test_moderate_route_is_eligible() -> None:
+    """Non-low risk alone does not disqualify a route."""
     route = make_route(
         (
             make_checkpoint("origin", 0.0, level=RiskLevel.MODERATE),
@@ -115,6 +122,7 @@ def test_moderate_route_is_eligible() -> None:
 
 
 def test_segment_lengths_come_from_cumulative_differences() -> None:
+    """Segments derive from cumulative distance deltas."""
     route = make_route(
         (
             make_checkpoint("origin", 0.0, level=RiskLevel.LOW),
@@ -130,6 +138,7 @@ def test_segment_lengths_come_from_cumulative_differences() -> None:
 
 
 def test_origin_contributes_zero_miles_but_counts_in_average() -> None:
+    """The origin scores without coloring miles."""
     route = make_route(
         (
             make_checkpoint("origin", 0.0, level=RiskLevel.SEVERE),
@@ -146,6 +155,7 @@ def test_origin_contributes_zero_miles_but_counts_in_average() -> None:
 
 
 def test_origin_missing_weather_makes_route_ineligible() -> None:
+    """Blind origins fail the route without adding miles."""
     route = make_route(
         (
             make_checkpoint("origin", 0.0, weather_available=False),
@@ -162,6 +172,7 @@ def test_origin_missing_weather_makes_route_ineligible() -> None:
 
 
 def test_duration_propagates_to_summary() -> None:
+    """Summaries carry the route duration unchanged."""
     route = make_route(
         (
             make_checkpoint("origin", 0.0, level=RiskLevel.LOW),
@@ -176,6 +187,7 @@ def test_duration_propagates_to_summary() -> None:
 
 
 def test_risk_reasons_are_preserved_on_checkpoints() -> None:
+    """Aggregation never drops explanatory reasons."""
     route = make_route(
         (
             make_checkpoint("origin", 0.0, level=RiskLevel.LOW),
@@ -204,6 +216,7 @@ def test_risk_reasons_are_preserved_on_checkpoints() -> None:
 
 
 def test_engine_risk_result_is_reused() -> None:
+    """Engine outputs aggregate without conversion."""
     route = make_route(
         (
             RouteCheckpoint(
@@ -234,6 +247,7 @@ def test_engine_risk_result_is_reused() -> None:
 
 
 def test_aggregate_route_summary_marks_missing_weather_ineligible() -> None:
+    """Missing weather is ineligible, never Low."""
     route = make_route(
         (
             make_checkpoint("origin", 0.0, level=RiskLevel.LOW),
@@ -255,6 +269,7 @@ def test_aggregate_route_summary_marks_missing_weather_ineligible() -> None:
 
 
 def test_aggregate_route_summary_marks_missing_risk_ineligible() -> None:
+    """Unclassified checkpoints fail the route with a 0.0 average."""
     route = make_route(
         (
             make_checkpoint(
@@ -272,6 +287,7 @@ def test_aggregate_route_summary_marks_missing_risk_ineligible() -> None:
 
 
 def test_low_and_moderate_segments_do_not_count_as_high_risk_miles() -> None:
+    """Only High/Severe/No-Travel color mileage buckets."""
     route = make_route(
         (
             make_checkpoint("origin", 0.0, level=RiskLevel.LOW),
@@ -289,6 +305,7 @@ def test_low_and_moderate_segments_do_not_count_as_high_risk_miles() -> None:
 
 
 def test_destination_segment_is_included() -> None:
+    """The final segment always counts toward the totals."""
     route = make_route(
         (
             make_checkpoint("origin", 0.0, level=RiskLevel.LOW),
@@ -302,6 +319,7 @@ def test_destination_segment_is_included() -> None:
 
 
 def test_checkpoint_distances_must_be_monotonic() -> None:
+    """Decreasing distances are rejected at the boundary."""
     with pytest.raises(
         ValueError,
         match="monotonically increasing",
@@ -316,6 +334,7 @@ def test_checkpoint_distances_must_be_monotonic() -> None:
 
 
 def test_checkpoint_distances_must_be_finite() -> None:
+    """Infinite distances cannot form segments."""
     with pytest.raises(
         ValueError,
         match="finite",
@@ -324,6 +343,7 @@ def test_checkpoint_distances_must_be_finite() -> None:
 
 
 def test_aggregate_routes_adds_summaries_without_mutating_input() -> None:
+    """Batch summarization copies frozen routes."""
     route = make_route(
         (
             make_checkpoint("origin", 0.0, level=RiskLevel.LOW),
@@ -339,6 +359,7 @@ def test_aggregate_routes_adds_summaries_without_mutating_input() -> None:
 
 
 def test_aggregate_multiple_routes() -> None:
+    """Each route summarizes independently in one pass."""
     first = make_route(
         (
             make_checkpoint("origin", 0.0, level=RiskLevel.LOW),
@@ -368,6 +389,7 @@ def test_aggregate_multiple_routes() -> None:
 
 
 def test_aggregate_routes_rejects_empty_input() -> None:
+    """Summarizing nothing is a caller error."""
     with pytest.raises(
         ValueError,
         match="At least one route",
