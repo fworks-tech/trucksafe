@@ -24,10 +24,7 @@ import type {
   MapBounds,
   NormalizedWeatherGrid,
 } from './geo';
-import {
-  HEATMAP_RISK_COLORS,
-  HEATMAP_RISK_RADIUS,
-} from './geo';
+import { HEATMAP_RISK_COLORS, HEATMAP_RISK_RADIUS } from './geo';
 
 const ROUTES_SOURCE = 'trucksafe-routes';
 const CHECKPOINTS_SOURCE = 'trucksafe-checkpoints';
@@ -451,16 +448,30 @@ export class RouteMapAdapter {
   }
 
   private addHeatmapLayer(): void {
-    const riskRadiusEntries = Object.entries(HEATMAP_RISK_RADIUS).flat() as (string | number)[];
-    const riskColorEntries = Object.entries(HEATMAP_RISK_COLORS).flat() as (string | number)[];
+    const riskRadiusEntries = Object.entries(HEATMAP_RISK_RADIUS).flat() as (
+      string | number
+    )[];
+    const riskColorEntries = Object.entries(HEATMAP_RISK_COLORS).flat() as (
+      string | number
+    )[];
 
     const circleLayer: AddLayerObject = {
       id: HEATMAP_LAYER,
       type: 'circle',
       source: HEATMAP_SOURCE,
       paint: {
-        'circle-radius': asExpression(['match', ['get', 'risk'], ...riskRadiusEntries, 8]),
-        'circle-color': asExpression(['match', ['get', 'risk'], ...riskColorEntries, '#78909c']),
+        'circle-radius': asExpression([
+          'match',
+          ['get', 'risk'],
+          ...riskRadiusEntries,
+          8,
+        ]),
+        'circle-color': asExpression([
+          'match',
+          ['get', 'risk'],
+          ...riskColorEntries,
+          '#78909c',
+        ]),
         'circle-opacity': 0.8,
         'circle-stroke-color': '#ffffff',
         'circle-stroke-width': 1,

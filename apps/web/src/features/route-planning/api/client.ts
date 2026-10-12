@@ -182,7 +182,7 @@ function toTypedResponse(parsed: z.infer<typeof responseSchema>): RoutePlanRespo
 }
 
 function toTypedWeatherGridResponse(
-  parsed: z.infer<typeof weatherGridResponseSchema>
+  parsed: z.infer<typeof weatherGridResponseSchema>,
 ): WeatherGridResponse {
   return {
     ...parsed,
@@ -295,7 +295,7 @@ export async function fetchWeatherGrid(
           'X-Request-ID': sentRequestId,
         },
         signal: options.signal,
-      }
+      },
     );
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
