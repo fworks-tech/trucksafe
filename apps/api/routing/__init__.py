@@ -10,3 +10,7 @@ databases, and external API providers.
 This package is not a registered Django application because it owns no
 models. Add an AppConfig and migrations/ if that changes.
 """
+
+from .weather_grid import WeatherGrid, WeatherGridCell, build_weather_grid
+
+__all__ = ["WeatherGrid", "WeatherGridCell", "build_weather_grid"]
