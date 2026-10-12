@@ -16,6 +16,7 @@ import type {
   RiskSegmentPayload,
   RoutePayload,
   RoutePlanResponse,
+  WeatherGridResponse,
 } from '../route-planning/types';
 
 /** One validated position as `[longitude, latitude]` (GeoJSON order). */
@@ -338,3 +339,78 @@ export function routeVisualState(
   if (selected) return 'selected';
   return 'eligible';
 }
+
+/** Weather grid cell for heatmap rendering. */
+export interface MappableWeatherCell {
+  cellId: string;
+  longitude: number;
+  latitude: number;
+  risk: RiskLevel | 'unavailable';
+  riskScore: number | null;
+  riskReasons: string[];
+  windMph: number | null;
+  rainInchesPerHour: number | null;
+  snowInchesPerHour: number | null;
+}
+
+/** Normalized weather grid for map rendering. */
+export interface NormalizedWeatherGrid {
+  cells: MappableWeatherCell[];
+  bounds: MapBounds | null;
+  forecastStart: string;
+  forecastEnd: string;
+}
+
+/** Convert a weather grid response to mappable cells. */
+export function normalizeWeatherGrid(
+  grid: WeatherGridResponse
+): NormalizedWeatherGrid {
+  const cells: MappableWeatherCell[] = [];
+  const positions: LngLat[] = [];
+
+  for (const cell of grid.cells) {
+    if (!isValidLatitude(cell.latitude) || !isValidLongitude(cell.longitude)) {
+      continue;
+    }
+    const risk = cell.risk_level ?? 'unavailable';
+    cells.push({
+      cellId: cell.cell_id,
+      longitude: cell.longitude,
+      latitude: cell.latitude,
+      risk,
+      riskScore: cell.risk_score,
+      riskReasons: cell.risk_reasons,
+      windMph: cell.weather?.wind_mph ?? null,
+      rainInchesPerHour: cell.weather?.rain_inches_per_hour ?? null,
+      snowInchesPerHour: cell.weather?.snow_inches_per_hour ?? null,
+    });
+    positions.push([cell.longitude, cell.latitude]);
+  }
+
+  return {
+    cells,
+    bounds: boundsForPositions(positions),
+    forecastStart: grid.forecast_start,
+    forecastEnd: grid.forecast_end,
+  };
+}
+
+/** Risk level to color mapping for heatmap circles. */
+export const HEATMAP_RISK_COLORS: Record<RiskLevel | 'unavailable', string> = {
+  LOW: '#1b5e20',
+  MODERATE: '#7a5c00',
+  HIGH: '#8a3c00',
+  SEVERE: '#a31226',
+  NO_TRAVEL: '#5c0a14',
+  unavailable: '#78909c',
+};
+
+/** Risk level to radius mapping for heatmap circles. */
+export const HEATMAP_RISK_RADIUS: Record<RiskLevel | 'unavailable', number> = {
+  LOW: 8,
+  MODERATE: 10,
+  HIGH: 12,
+  SEVERE: 14,
+  NO_TRAVEL: 16,
+  unavailable: 6,
+};

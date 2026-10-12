@@ -22,14 +22,21 @@ import type {
   MappableRouteLine,
   MappableRouteSegment,
   MapBounds,
+  NormalizedWeatherGrid,
+} from './geo';
+import {
+  HEATMAP_RISK_COLORS,
+  HEATMAP_RISK_RADIUS,
 } from './geo';
 
 const ROUTES_SOURCE = 'trucksafe-routes';
 const CHECKPOINTS_SOURCE = 'trucksafe-checkpoints';
+const HEATMAP_SOURCE = 'trucksafe-heatmap';
 const ROUTE_LINES_LAYER = 'trucksafe-route-lines';
 const ROUTE_SELECTED_LAYER = 'trucksafe-route-selected';
 const CHECKPOINT_LAYER = 'trucksafe-checkpoints';
 const CHECKPOINT_SELECTED_LAYER = 'trucksafe-checkpoint-selected';
+const HEATMAP_LAYER = 'trucksafe-heatmap';
 
 export type MapInitFailure = 'webgl-unavailable' | 'style-missing' | 'init-failed';
 
@@ -183,6 +190,16 @@ export class RouteMapAdapter {
       const checkpointId = feature?.properties['checkpointId'];
       if (typeof checkpointId === 'string') {
         this.callbacks.onCheckpointSelect?.(checkpointId);
+        const coordinates = (feature?.geometry as { coordinates?: LngLat } | undefined)
+          ?.coordinates;
+        if (coordinates !== undefined) this.showPopup(coordinates);
+      }
+    });
+    this.map.on('click', HEATMAP_LAYER, (event: MapLayerMouseEvent) => {
+      const feature = event.features?.[0];
+      const cellId = feature?.properties['cellId'];
+      if (typeof cellId === 'string') {
+        this.callbacks.onCheckpointSelect?.(cellId);
         const coordinates = (feature?.geometry as { coordinates?: LngLat } | undefined)
           ?.coordinates;
         if (coordinates !== undefined) this.showPopup(coordinates);
@@ -379,6 +396,77 @@ export class RouteMapAdapter {
       });
       this.layersReady = true;
     }
+  }
+
+  /** Set or update the heatmap layer from weather grid data. */
+  setHeatmap(grid: NormalizedWeatherGrid | null): void {
+    if (!this.layersReady) return;
+
+    if (grid === null || grid.cells.length === 0) {
+      this.clearHeatmap();
+      return;
+    }
+
+    const features = grid.cells.map((cell) => ({
+      type: 'Feature' as const,
+      properties: {
+        cellId: cell.cellId,
+        risk: cell.risk,
+        riskScore: cell.riskScore,
+        riskReasons: cell.riskReasons,
+        windMph: cell.windMph,
+        rainInchesPerHour: cell.rainInchesPerHour,
+        snowInchesPerHour: cell.snowInchesPerHour,
+      },
+      geometry: {
+        type: 'Point' as const,
+        coordinates: [cell.longitude, cell.latitude],
+      },
+    }));
+
+    this.upsertSource(HEATMAP_SOURCE, {
+      type: 'FeatureCollection' as const,
+      features,
+    });
+
+    // Ensure heatmap layer exists
+    if (!this.map.getLayer(HEATMAP_LAYER)) {
+      this.addHeatmapLayer();
+    }
+  }
+
+  /** Remove the heatmap layer and source. */
+  clearHeatmap(): void {
+    if (!this.layersReady || !this.map) return;
+    try {
+      if (this.map.getLayer(HEATMAP_LAYER)) {
+        this.map.removeLayer(HEATMAP_LAYER);
+      }
+      if (this.map.getSource(HEATMAP_SOURCE)) {
+        this.map.removeSource(HEATMAP_SOURCE);
+      }
+    } catch {
+      // Map may be in an inconsistent state during teardown
+    }
+  }
+
+  private addHeatmapLayer(): void {
+    const riskRadiusEntries = Object.entries(HEATMAP_RISK_RADIUS).flat() as (string | number)[];
+    const riskColorEntries = Object.entries(HEATMAP_RISK_COLORS).flat() as (string | number)[];
+
+    const circleLayer: AddLayerObject = {
+      id: HEATMAP_LAYER,
+      type: 'circle',
+      source: HEATMAP_SOURCE,
+      paint: {
+        'circle-radius': asExpression(['match', ['get', 'risk'], ...riskRadiusEntries, 8]),
+        'circle-color': asExpression(['match', ['get', 'risk'], ...riskColorEntries, '#78909c']),
+        'circle-opacity': 0.8,
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': 1,
+      },
+    };
+    this.map.addLayer(circleLayer);
   }
 
   /** Emphasize the selected route and checkpoint without refitting. */
