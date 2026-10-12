@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Supersede runs for the same ref so a new push does not leave a stale
+# green check next to an older red one.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -e '.[dev]'
+      - name: Lint
+        run: ruff check .
+      - name: Check formatting
+        run: ruff format --check .
+      - name: Type check
+        run: mypy .
+      - name: Test
+        run: python -m pytest -q
+
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          # The lockfile lives under apps/web, not the repository root.
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm run test -- --run
+      - name: Check formatting
+        run: npm run format:check
+      - name: Build
+        run: npm run build
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install backend dependencies
+        working-directory: apps/api
+        run: pip install -e '.[dev]'
+      - name: Install frontend dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: Install Playwright browser
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+      # The dev proxy forwards /api to the API on :8000, and the specs
+      # assert on real responses, so the API must be migrated and running
+      # before the browser tests start.
+      - name: Apply migrations
+        working-directory: apps/api
+        run: python manage.py migrate --noinput
+      - name: Start API
+        working-directory: apps/api
+        run: nohup python manage.py runserver 8000 --noreload > /tmp/django.log 2>&1 &
+      - name: Wait for API
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/api/v1/health > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API did not become ready" >&2
+          exit 1
+      # A single worker avoids the cold Vite transform flake that the
+      # default parallelism produces under CI resource limits.
+      - name: Run Playwright tests
+        working-directory: apps/web
+        run: npm run e2e -- --workers=1
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: apps/web/test-results/
+          retention-days: 7

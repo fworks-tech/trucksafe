@@ -160,8 +160,32 @@ pytest --cov-report=html
 ```bash
 npm run test
 npm run test:coverage
-npm run test:e2e
+npm run e2e
 ```
+
+`npm run e2e` needs the API on `:8000`; Playwright starts the Vite dev
+server itself.
+
+## Continuous Integration
+
+`.github/workflows/ci.yml` runs the local commands above on every pull
+request and every push to `main`, in three independent jobs:
+
+| Job | Working directory | Commands |
+|-----|-------------------|----------|
+| `backend` | `apps/api` | `ruff check .`, `ruff format --check .`, `mypy .`, `python -m pytest -q` |
+| `web` | `apps/web` | `npm run typecheck`, `npm run lint`, `npm run test -- --run`, `npm run format:check`, `npm run build` |
+| `e2e` | both | `npm run e2e -- --workers=1`, with a migrated API on `:8000` behind the Vite dev proxy |
+
+The backend runs with no environment configuration: `DJANGO_DEBUG`
+defaults to on and the secret key falls back to the development value,
+so SQLite and the mock providers need no secrets. The frontend needs no
+`.env` either, because the client falls back to same-origin `/api/v1`.
+
+Coverage is measured by `npm run test:coverage` against the thresholds in
+`apps/web/vite.config.ts`, but it is not a CI gate. Each job uploads
+Playwright artifacts only when it fails, so a red run carries its own
+evidence.
 
 ## Test Data
 
