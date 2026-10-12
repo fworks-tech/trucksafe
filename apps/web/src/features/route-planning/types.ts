@@ -84,6 +84,34 @@ export interface RoutePlanResponse {
   routes: RoutePayload[];
 }
 
+/** Weather grid cell from the backend weather-grid endpoint. */
+export interface WeatherGridCellPayload {
+  cell_id: string;
+  latitude: number;
+  longitude: number;
+  /** UTC ISO 8601 timestamp with `Z` suffix. */
+  valid_at: string;
+  risk_level: RiskLevel | null;
+  risk_score: number | null;
+  risk_reasons: string[];
+  weather: {
+    wind_mph: number;
+    rain_inches_per_hour: number;
+    snow_inches_per_hour: number;
+  } | null;
+}
+
+/** Weather grid response from the backend weather-grid endpoint. */
+export interface WeatherGridResponse {
+  route_id: string;
+  route_plan_id: string;
+  /** UTC ISO 8601 timestamp with `Z` suffix. */
+  forecast_start: string;
+  /** UTC ISO 8601 timestamp with `Z` suffix. */
+  forecast_end: string;
+  cells: WeatherGridCellPayload[];
+}
+
 /** Standard backend error envelope. */
 export interface ApiErrorEnvelope {
   error: {

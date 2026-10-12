@@ -21,6 +21,7 @@ import type {
   RoutePayload,
   RoutePlanRequest,
   RoutePlanResponse,
+  WeatherGridResponse,
 } from '../types';
 import { categoryForStatus, RoutePlanApiError } from './errors';
 import { isValidRequestId, resolveRequestId } from './requestId';
@@ -88,6 +89,34 @@ const responseSchema = z.object({
   routes: z.array(routeSchema),
 });
 
+const weatherSchema = z
+  .object({
+    wind_mph: z.number(),
+    rain_inches_per_hour: z.number(),
+    snow_inches_per_hour: z.number(),
+  })
+  .nullable()
+  .catch(null);
+
+const weatherGridCellSchema = z.object({
+  cell_id: z.string(),
+  latitude: z.number(),
+  longitude: z.number(),
+  valid_at: z.string(),
+  risk_level: riskLevelSchema.nullable().catch(null),
+  risk_score: z.number().nullable().catch(null),
+  risk_reasons: z.array(z.string()).catch([]),
+  weather: weatherSchema,
+});
+
+const weatherGridResponseSchema = z.object({
+  route_id: z.string(),
+  route_plan_id: z.string(),
+  forecast_start: z.string(),
+  forecast_end: z.string(),
+  cells: z.array(weatherGridCellSchema),
+});
+
 const envelopeSchema = z.object({
   error: z.object({
     code: z.string(),
@@ -104,6 +133,17 @@ export interface CreateRoutePlanOptions {
 
 export interface CreateRoutePlanResult {
   data: RoutePlanResponse;
+  requestId: string;
+}
+
+export interface FetchWeatherGridOptions {
+  signal?: AbortSignal;
+  /** Propagated when valid, otherwise a fresh id is generated. */
+  requestId?: string;
+}
+
+export interface FetchWeatherGridResult {
+  data: WeatherGridResponse;
   requestId: string;
 }
 
@@ -138,6 +178,19 @@ function toTypedResponse(parsed: z.infer<typeof responseSchema>): RoutePlanRespo
     recommendation_reason:
       parsed.recommendation_reason as RecommendationReasonPayload | null,
     routes,
+  };
+}
+
+function toTypedWeatherGridResponse(
+  parsed: z.infer<typeof weatherGridResponseSchema>
+): WeatherGridResponse {
+  return {
+    ...parsed,
+    cells: parsed.cells.map((cell) => ({
+      ...cell,
+      risk_level: cell.risk_level as RiskLevel | null,
+      weather: cell.weather,
+    })),
   };
 }
 
@@ -209,4 +262,87 @@ export async function createRoutePlan(
     });
   }
   return { data: toTypedResponse(parsed.data), requestId };
+}
+
+/**
+ * Fetch the weather grid for a route plan at a specific forecast offset.
+ * Resolves with the parsed payload and the effective request id;
+ * rejects with `RoutePlanApiError` on any failure.
+ */
+export async function fetchWeatherGrid(
+  routePlanId: string,
+  offsetHours: number,
+  options: FetchWeatherGridOptions = {},
+): Promise<FetchWeatherGridResult> {
+  if (!Number.isInteger(offsetHours) || offsetHours < 0 || offsetHours > 48) {
+    throw new RoutePlanApiError({
+      category: 'malformed',
+      status: 400,
+      requestId: resolveRequestId(options.requestId),
+      backendCode: 'INVALID_REQUEST',
+      backendMessage: 'offsetHours must be an integer in 0..48',
+    });
+  }
+
+  const sentRequestId = resolveRequestId(options.requestId);
+  let response: Response;
+  try {
+    response = await fetch(
+      `${apiBaseUrl()}/route-plans/${encodeURIComponent(routePlanId)}/weather-grid?offset_hours=${offsetHours}`,
+      {
+        method: 'GET',
+        headers: {
+          'X-Request-ID': sentRequestId,
+        },
+        signal: options.signal,
+      }
+    );
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new RoutePlanApiError({
+        category: 'aborted',
+        status: null,
+        requestId: sentRequestId,
+        backendCode: null,
+        backendMessage: null,
+      });
+    }
+    throw new RoutePlanApiError({
+      category: 'network',
+      status: null,
+      requestId: sentRequestId,
+      backendCode: null,
+      backendMessage: null,
+    });
+  }
+
+  const echoed = response.headers.get('X-Request-ID');
+  const requestId = isValidRequestId(echoed) ? echoed : sentRequestId;
+  const body = await readJsonBody(response);
+
+  if (!response.ok) {
+    const envelope = envelopeSchema.safeParse(body);
+    const parsed: ApiErrorEnvelope['error'] | null = envelope.success
+      ? envelope.data.error
+      : null;
+    throw new RoutePlanApiError({
+      category: categoryForStatus(response.status),
+      status: response.status,
+      requestId: parsed?.request_id ?? requestId,
+      backendCode: parsed?.code ?? null,
+      backendMessage: parsed?.message ?? null,
+    });
+  }
+
+  const parsed = weatherGridResponseSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new RoutePlanApiError({
+      category: 'malformed',
+      status: response.status,
+      requestId,
+      backendCode: null,
+      backendMessage: null,
+    });
+  }
+  return { data: toTypedWeatherGridResponse(parsed.data), requestId };
 }
