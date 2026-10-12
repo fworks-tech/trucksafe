@@ -680,6 +680,11 @@ mock providers, and the route-planning endpoint:
 Coverage is near-complete across `risk`, `routing`, `providers`, and
 `route_plans` (remaining gaps are defensive-validation branches).
 
+Frontend unit, component, and integration tests cover form validation,
+the HTTP client and its error envelopes, route-map rendering, and
+segment-risk selection. Playwright covers the primary user journey
+across desktop and mobile viewports, including the accessibility checks.
+
 Run them with:
 
 ```bash
@@ -691,8 +696,24 @@ python -m pytest --cov=risk
 ### Planned
 
 - API contract tests against the OpenAPI document
-- Playwright end-to-end tests for the primary user journey
 - Property-based tests (Hypothesis) for route ranking invariants
+
+---
+
+## Continuous Integration
+
+Every pull request and every push to `main` runs `.github/workflows/ci.yml`,
+which has three jobs that report independently:
+
+| Job | Runs |
+|-----|------|
+| `backend` | `ruff check`, `ruff format --check`, `mypy`, `pytest` in `apps/api` |
+| `web` | `typecheck`, `lint`, `test`, `format:check`, `build` in `apps/web` |
+| `e2e` | `playwright test` with the Django API on `:8000` behind the Vite dev proxy |
+
+The same commands run locally, so a green check means the change passes
+the gates described above on Python 3.11 and Node 20. A run that is
+superseded by a newer push to the same ref is cancelled automatically.
 
 ---
 
