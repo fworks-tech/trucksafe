@@ -7,6 +7,11 @@ const backendOrigin = 'http://localhost:8000';
 
 export default defineConfig({
   plugins: [react()],
+  // maplibre-gl ships a web worker (`maplibre-gl-worker.mjs`) that the
+  // dependency optimizer cannot pre-bundle; serve it unbundled in dev.
+  optimizeDeps: {
+    exclude: ['maplibre-gl'],
+  },
   server: {
     proxy: {
       '/api': {
@@ -20,7 +25,9 @@ export default defineConfig({
       output: {
         // Keep UI/query/form vendors out of the app chunk so vendor code
         // caches across deploys. (React itself stays in the app chunk:
-        // splitting it out leaves an empty facade chunk.)
+        // splitting it out leaves an empty facade chunk.) The map library
+        // only loads with a result (React.lazy), so it gets its own chunk
+        // and never weighs down the initial form route.
         manualChunks: {
           mui: [
             '@mui/material',
@@ -30,6 +37,7 @@ export default defineConfig({
           ],
           query: ['@tanstack/react-query'],
           form: ['react-hook-form', '@hookform/resolvers', 'zod'],
+          maplibre: ['maplibre-gl'],
         },
       },
     },

@@ -1,4 +1,4 @@
-import { Box, Card, CardContent, Chip, Stack, Typography } from '@mui/material';
+import { Box, Button, Card, CardContent, Chip, Stack, Typography } from '@mui/material';
 
 import { statusTokens } from '../../app/theme';
 import { formatDuration, formatMiles, formatScore } from '../../lib/format';
@@ -12,18 +12,34 @@ interface RouteCardProps {
   route: RoutePayload;
   /** True only when the backend marks this eligible route recommended. */
   recommended: boolean;
+  /** True when this route is the current map/list selection. */
+  selected?: boolean;
+  /** When provided, the card offers a selection control synced with the map. */
+  onSelect?: (routeId: string) => void;
 }
 
 /** One route alternative. Ineligible routes are never shown as recommended. */
-export function RouteCard({ route, recommended }: RouteCardProps): React.JSX.Element {
+export function RouteCard({
+  route,
+  recommended,
+  selected = false,
+  onSelect,
+}: RouteCardProps): React.JSX.Element {
   const showRecommended = recommended && route.is_eligible;
   const worst = worstRiskLevel(route.checkpoints);
   const token = statusTokens.recommended;
 
   return (
     <Card
-      aria-label={`Route ${route.id}${showRecommended ? ', recommended' : ''}${route.is_eligible ? '' : ', not eligible'}`}
-      sx={showRecommended ? { border: `2px solid ${token.border}` } : undefined}
+      aria-label={`Route ${route.id}${showRecommended ? ', recommended' : ''}${route.is_eligible ? '' : ', not eligible'}${selected ? ', selected' : ''}`}
+      sx={
+        showRecommended || selected
+          ? {
+              border: `2px solid ${token.border}`,
+              ...(selected ? { boxShadow: `0 0 0 2px ${token.border}` } : null),
+            }
+          : undefined
+      }
     >
       <CardContent>
         <Stack spacing={1.5}>
@@ -37,6 +53,7 @@ export function RouteCard({ route, recommended }: RouteCardProps): React.JSX.Ele
               <Chip label="Recommended" color="primary" sx={{ fontWeight: 700 }} />
             )}
             <EligibilityBadge isEligible={route.is_eligible} />
+            {selected && <Chip label="Selected" size="small" color="primary" />}
           </Box>
           <Typography variant="body2" color="text.secondary">
             {formatDuration(route.duration_seconds)} · {formatMiles(route.distance_miles)}
@@ -55,6 +72,19 @@ export function RouteCard({ route, recommended }: RouteCardProps): React.JSX.Ele
             {' · '}Avg risk {formatScore(route.average_risk_score)}
           </Typography>
           <CheckpointList checkpoints={route.checkpoints} routeId={route.id} />
+          {onSelect !== undefined && (
+            <Box>
+              <Button
+                type="button"
+                variant={selected ? 'contained' : 'outlined'}
+                size="small"
+                aria-pressed={selected}
+                onClick={() => onSelect(route.id)}
+              >
+                {selected ? 'Selected on map' : 'Show on map'}
+              </Button>
+            </Box>
+          )}
         </Stack>
       </CardContent>
     </Card>

@@ -6,12 +6,16 @@ import { RouteCard } from './RouteCard';
 interface RouteComparisonProps {
   routes: RoutePayload[];
   recommendedRouteId: string | null;
+  selectedRouteId: string | null;
+  onSelectRoute: (routeId: string) => void;
 }
 
 /** Side-by-side route alternatives; vertical stack on small screens. */
 export function RouteComparison({
   routes,
   recommendedRouteId,
+  selectedRouteId,
+  onSelectRoute,
 }: RouteComparisonProps): React.JSX.Element {
   return (
     <section aria-label="Route alternatives">
@@ -21,7 +25,12 @@ export function RouteComparison({
       <Grid container spacing={2}>
         {routes.map((route) => (
           <Grid key={route.id} size={{ xs: 12, md: 4 }}>
-            <RouteCard route={route} recommended={route.id === recommendedRouteId} />
+            <RouteCard
+              route={route}
+              recommended={route.id === recommendedRouteId}
+              selected={route.id === selectedRouteId}
+              onSelect={onSelectRoute}
+            />
           </Grid>
         ))}
       </Grid>

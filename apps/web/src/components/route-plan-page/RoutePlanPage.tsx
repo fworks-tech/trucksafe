@@ -1,5 +1,5 @@
 import { Alert, Box, Button, Stack, Typography } from '@mui/material';
-import { useCallback, useEffect, useRef } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 
 import { useRoutePlanMutation } from '../../features/route-planning/hooks/useRoutePlan';
 import {
@@ -12,6 +12,14 @@ import { RequestStatus } from '../route-card/RequestStatus';
 import { RouteComparison } from '../route-card/RouteComparison';
 import { WarningList } from '../route-card/WarningList';
 
+// Lazy so the map bundle only loads once a result exists; the initial
+// form route stays lightweight.
+const RouteMapSection = lazy(() =>
+  import('../route-map/RouteMapSection').then((module) => ({
+    default: module.RouteMapSection,
+  })),
+);
+
 /**
  * Single-page route-planning workflow: form, status, and results.
  * A new submission always clears the previous result first, so stale
@@ -20,6 +28,9 @@ import { WarningList } from '../route-card/WarningList';
 export function RoutePlanPage(): React.JSX.Element {
   const mutation = useRoutePlanMutation();
   const abortRef = useRef<AbortController | null>(null);
+  // Viewing selection shared by the map and the route cards. Derived
+  // from the backend recommendation; never stored server-side.
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
 
   useEffect(() => {
     return (): void => {
@@ -32,6 +43,7 @@ export function RoutePlanPage(): React.JSX.Element {
   const handleSubmit = useCallback(
     (values: RoutePlanFormValues) => {
       mutation.reset();
+      setSelectedRouteId(null);
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
@@ -50,13 +62,25 @@ export function RoutePlanPage(): React.JSX.Element {
   const handleNewPlan = useCallback(() => {
     abortRef.current?.abort();
     mutation.reset();
+    setSelectedRouteId(null);
   }, [mutation]);
+
+  const handleSelectRoute = useCallback((routeId: string) => {
+    setSelectedRouteId(routeId);
+  }, []);
 
   const error = mutation.error;
   const response = mutation.isSuccess ? mutation.data.data : null;
   const requestId = mutation.isSuccess
     ? mutation.data.requestId
     : (error?.requestId ?? null);
+  // Default to the backend recommendation; fall back to the first route
+  // when nothing is recommended. A stale id (e.g. after a new plan)
+  // resolves to the same default instead of a missing route.
+  const effectiveSelection =
+    response !== null && response.routes.some((route) => route.id === selectedRouteId)
+      ? selectedRouteId
+      : (response?.recommended_route_id ?? response?.routes[0]?.id ?? null);
   const state = mutation.isPending
     ? 'pending'
     : mutation.isError
@@ -110,9 +134,18 @@ export function RoutePlanPage(): React.JSX.Element {
             <>
               <RecommendationSummary response={response} requestId={requestId} />
               <WarningList warnings={response.warnings} />
+              <Suspense fallback={null}>
+                <RouteMapSection
+                  response={response}
+                  selectedRouteId={effectiveSelection}
+                  onSelectRoute={handleSelectRoute}
+                />
+              </Suspense>
               <RouteComparison
                 routes={response.routes}
                 recommendedRouteId={response.recommended_route_id}
+                selectedRouteId={effectiveSelection}
+                onSelectRoute={handleSelectRoute}
               />
             </>
           )}
