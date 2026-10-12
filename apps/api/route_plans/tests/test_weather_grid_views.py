@@ -3,6 +3,7 @@
 from collections.abc import Callable
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 from rest_framework.test import APIClient
 
 from providers.errors import ProviderPermanentError
@@ -82,7 +83,15 @@ def test_weather_grid_returns_200_with_valid_shape(client: APIClient) -> None:
     assert len(body["cells"]) > 0
 
     cell = body["cells"][0]
-    for key in ("cell_id", "latitude", "longitude", "valid_at", "risk_level", "risk_score", "risk_reasons"):
+    for key in (
+        "cell_id",
+        "latitude",
+        "longitude",
+        "valid_at",
+        "risk_level",
+        "risk_score",
+        "risk_reasons",
+    ):
         assert key in cell
     assert cell["valid_at"].endswith("Z")
     assert response["X-Request-ID"]
@@ -95,8 +104,12 @@ def test_weather_grid_offset_hours_range(client: APIClient) -> None:
     plan_id = plan["id"]
 
     for offset in (0, 12, 24, 36, 48):
-        response = client.get(f"{URL_BASE}/{plan_id}/weather-grid?offset_hours={offset}")
-        assert response.status_code == 200, f"offset_hours={offset} failed: {response.json()}"
+        response = client.get(
+            f"{URL_BASE}/{plan_id}/weather-grid?offset_hours={offset}"
+        )
+        assert response.status_code == 200, (
+            f"offset_hours={offset} failed: {response.json()}"
+        )
         body = response.json()
         assert len(body["cells"]) > 0
 
@@ -134,7 +147,9 @@ def test_weather_grid_offset_out_of_range_returns_400(client: APIClient) -> None
     plan_id = plan["id"]
 
     for offset in (-1, 49):
-        response = client.get(f"{URL_BASE}/{plan_id}/weather-grid?offset_hours={offset}")
+        response = client.get(
+            f"{URL_BASE}/{plan_id}/weather-grid?offset_hours={offset}"
+        )
         assert response.status_code == 400, f"offset={offset} should fail"
         error = response.json()["error"]
         assert error["code"] == "INVALID_REQUEST"
@@ -152,7 +167,9 @@ def test_weather_grid_not_found_returns_404(client: APIClient) -> None:
 
 
 @pytest.mark.django_db
-def test_weather_grid_unavailable_weather_returns_null_risk(client: APIClient, monkeypatch) -> None:
+def test_weather_grid_unavailable_weather_returns_null_risk(
+    client: APIClient, monkeypatch: MonkeyPatch
+) -> None:
     """Weather provider returning None yields cells with null risk."""
     plan = _create_plan(client)
     plan_id = plan["id"]
@@ -174,7 +191,9 @@ def test_weather_grid_unavailable_weather_returns_null_risk(client: APIClient, m
 
 
 @pytest.mark.django_db
-def test_weather_grid_transient_failure_returns_503(client: APIClient, monkeypatch) -> None:
+def test_weather_grid_transient_failure_returns_503(
+    client: APIClient, monkeypatch: MonkeyPatch
+) -> None:
     """Exhausted transient weather failures return 503."""
     plan = _create_plan(client)
     plan_id = plan["id"]
@@ -192,7 +211,9 @@ def test_weather_grid_transient_failure_returns_503(client: APIClient, monkeypat
 
 
 @pytest.mark.django_db
-def test_weather_grid_permanent_failure_returns_422(client: APIClient, monkeypatch) -> None:
+def test_weather_grid_permanent_failure_returns_422(
+    client: APIClient, monkeypatch: MonkeyPatch
+) -> None:
     """Permanent weather provider error returns 422."""
     plan = _create_plan(client)
     plan_id = plan["id"]
@@ -253,7 +274,9 @@ def test_weather_grid_different_offsets_different_cells(client: APIClient) -> No
 
 
 @pytest.mark.django_db
-def test_weather_grid_cell_contains_raw_weather_when_available(client: APIClient) -> None:
+def test_weather_grid_cell_contains_raw_weather_when_available(
+    client: APIClient,
+) -> None:
     """Cells with available weather include raw weather fields."""
     plan = _create_plan(client)
     plan_id = plan["id"]

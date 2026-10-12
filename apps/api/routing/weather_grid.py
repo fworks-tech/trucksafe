@@ -17,6 +17,7 @@ from risk.schemas import RiskLevel
 
 if TYPE_CHECKING:
     from routing.checkpoints import Coordinate
+    from providers.protocols import WeatherProvider
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,9 +51,7 @@ class WeatherGridCell:
         if not self.cell_id.strip():
             raise ValueError("cell_id must not be empty")
         if not isfinite(self.latitude) or not -90.0 <= self.latitude <= 90.0:
-            raise ValueError(
-                f"latitude must be between -90 and 90: {self.latitude!r}"
-            )
+            raise ValueError(f"latitude must be between -90 and 90: {self.latitude!r}")
         if not isfinite(self.longitude) or not -180.0 <= self.longitude <= 180.0:
             raise ValueError(
                 f"longitude must be between -180 and 180: {self.longitude!r}"
@@ -148,7 +147,7 @@ def build_weather_grid(
     departure_at: datetime,
     load_weight_lb: float,
     offset_hours: int,
-    weather_provider: object,
+    weather_provider: WeatherProvider,
 ) -> WeatherGrid:
     """
     Build a weather grid for the given route and forecast offset.
@@ -181,9 +180,9 @@ def build_weather_grid(
         raise ValueError("departure_at must be timezone-aware (UTC)")
 
     departure_utc = departure_at.astimezone(UTC)
-    valid_at = departure_utc.replace(
-        minute=0, second=0, microsecond=0
-    ) + timedelta(hours=offset_hours)
+    valid_at = departure_utc.replace(minute=0, second=0, microsecond=0) + timedelta(
+        hours=offset_hours
+    )
 
     cells = []
     for index, checkpoint in enumerate(checkpoints):
@@ -207,6 +206,7 @@ def build_weather_grid(
             )
         else:
             from risk.engine import calculate_risk
+
             risk_result = calculate_risk(observation, load_weight_lb)
             cells.append(
                 WeatherGridCell(
@@ -245,8 +245,8 @@ def _validate_checkpoint(checkpoint: Coordinate) -> None:
             f"latitude must be between -90 and 90: {checkpoint.latitude!r}"
         )
     if not isfinite(checkpoint.longitude) or not (
-            -180.0 <= checkpoint.longitude <= 180.0
-        ):
+        -180.0 <= checkpoint.longitude <= 180.0
+    ):
         raise ValueError(
             f"longitude must be between -180 and 180: {checkpoint.longitude!r}"
         )

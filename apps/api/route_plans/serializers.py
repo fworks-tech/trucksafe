@@ -212,7 +212,9 @@ def build_weather_grid_response(grid: WeatherGrid) -> dict[str, Any]:
                 "latitude": cell.latitude,
                 "longitude": cell.longitude,
                 "valid_at": format_eta(cell.valid_at),
-                "risk_level": cell.risk_level.name if cell.risk_level is not None else None,
+                "risk_level": cell.risk_level.name
+                if cell.risk_level is not None
+                else None,
                 "risk_score": cell.risk_score,
                 "risk_reasons": list(cell.risk_reasons),
                 "weather": {

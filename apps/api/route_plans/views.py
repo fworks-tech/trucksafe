@@ -178,7 +178,6 @@ class WeatherGridView(APIView):
             route_data = response_data["routes"][0]
             load_weight_lb = plan.load_weight_lb
             departure_at = plan.departure_at
-            checkpoint_interval_miles = plan.checkpoint_interval_miles
 
             # Reconstruct checkpoints from route data
             checkpoints = []
