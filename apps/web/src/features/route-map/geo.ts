@@ -362,9 +362,7 @@ export interface NormalizedWeatherGrid {
 }
 
 /** Convert a weather grid response to mappable cells. */
-export function normalizeWeatherGrid(
-  grid: WeatherGridResponse
-): NormalizedWeatherGrid {
+export function normalizeWeatherGrid(grid: WeatherGridResponse): NormalizedWeatherGrid {
   const cells: MappableWeatherCell[] = [];
   const positions: LngLat[] = [];
 

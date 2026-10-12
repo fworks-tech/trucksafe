@@ -3,7 +3,12 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-import { normalizePlanMap, normalizeWeatherGrid, type MappableCheckpoint, type NormalizedWeatherGrid } from '../../features/route-map/geo';
+import {
+  normalizePlanMap,
+  normalizeWeatherGrid,
+  type MappableCheckpoint,
+  type NormalizedWeatherGrid,
+} from '../../features/route-map/geo';
 import { RouteMapAdapter } from '../../features/route-map/mapAdapter';
 import { mapStyleUrl } from '../../features/route-map/mapConfig';
 import type { RoutePlanResponse } from '../../features/route-planning/types';
@@ -88,14 +93,15 @@ export function RouteMapSection({
         setWeatherGrid(normalized);
         setGridCache((prev) => ({ ...prev, [offsetHours]: normalized }));
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to load forecast';
+        const message =
+          error instanceof Error ? error.message : 'Failed to load forecast';
         setGridError(message);
         setWeatherGrid(null);
       } finally {
         setGridLoading(false);
       }
     },
-    [response.id, gridCache]
+    [response.id, gridCache],
   );
 
   useEffect(() => {

@@ -63,7 +63,14 @@ export function ForecastSlider({
       aria-label="Weather forecast slider"
       sx={{ width: '100%', mt: 2, mb: 1 }}
     >
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          mb: 1,
+        }}
+      >
         <Typography variant="body1" fontWeight={600} gutterBottom>
           Forecast offset
         </Typography>
@@ -72,7 +79,11 @@ export function ForecastSlider({
         </Typography>
       </Box>
 
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ display: 'block', mb: 1 }}
+      >
         {formattedTime}
         {loading && ' — Loading…'}
         {error && ` — Error: ${error}`}
