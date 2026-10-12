@@ -47,12 +47,46 @@ describe('RouteComparison', () => {
       <RouteComparison
         routes={plan.routes}
         recommendedRouteId={plan.recommended_route_id}
+        selectedRouteId={null}
+        onSelectRoute={() => {}}
       />,
     );
     expect(screen.getByText('Route alternatives (3)')).toBeInTheDocument();
     for (const route of plan.routes) {
       expect(screen.getByText(route.id)).toBeInTheDocument();
     }
+  });
+
+  it('marks the selected route and syncs selection through cards', async () => {
+    const user = userEvent.setup();
+    const seen: string[] = [];
+    const plan = makeRoutePlan();
+    const { rerender } = renderWithProviders(
+      <RouteComparison
+        routes={plan.routes}
+        recommendedRouteId={plan.recommended_route_id}
+        selectedRouteId="route-1"
+        onSelectRoute={(id) => seen.push(id)}
+      />,
+    );
+    expect(screen.getAllByText('Selected')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Selected on map' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    const showButtons = screen.getAllByRole('button', { name: 'Show on map' });
+    expect(showButtons).toHaveLength(2);
+    await user.click(showButtons[0]!);
+    expect(seen).toEqual(['route-2']);
+    rerender(
+      <RouteComparison
+        routes={plan.routes}
+        recommendedRouteId={plan.recommended_route_id}
+        selectedRouteId="route-2"
+        onSelectRoute={(id) => seen.push(id)}
+      />,
+    );
+    expect(screen.getAllByText('Selected')).toHaveLength(1);
   });
 });
 
