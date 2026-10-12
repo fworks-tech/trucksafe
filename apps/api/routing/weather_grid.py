@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING
 from risk.schemas import RiskLevel
 
 if TYPE_CHECKING:
-    from routing.checkpoints import Coordinate
     from providers.protocols import WeatherProvider
+    from routing.checkpoints import Coordinate
 
 
 @dataclass(frozen=True, slots=True)

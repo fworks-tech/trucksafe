@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from risk.schemas import RiskLevel, WeatherObservation
-from routing.checkpoints import Checkpoint, Coordinate
+from routing.checkpoints import Coordinate
 from routing.weather_grid import WeatherGrid, WeatherGridCell, build_weather_grid
 
 
