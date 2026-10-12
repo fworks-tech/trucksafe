@@ -1,16 +1,18 @@
 import { Box, Skeleton, Stack, Typography } from '@mui/material';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-import { normalizePlanMap, type MappableCheckpoint } from '../../features/route-map/geo';
+import { normalizePlanMap, normalizeWeatherGrid, type MappableCheckpoint, type NormalizedWeatherGrid } from '../../features/route-map/geo';
 import { RouteMapAdapter } from '../../features/route-map/mapAdapter';
 import { mapStyleUrl } from '../../features/route-map/mapConfig';
 import type { RoutePlanResponse } from '../../features/route-planning/types';
+import { fetchWeatherGrid } from '../../features/route-planning/api/client';
 import { MapCheckpointDetail } from './MapCheckpointDetail';
 import { MapRouteSelection, type RouteSelectionEntry } from './MapRouteSelection';
 import { RouteMapFallback } from './RouteMapFallback';
 import { RouteMapLegend } from './RouteMapLegend';
+import { ForecastSlider } from './ForecastSlider';
 
 interface RouteMapSectionProps {
   response: RoutePlanResponse;
@@ -40,6 +42,13 @@ export function RouteMapSection({
   const [attempt, setAttempt] = useState(0);
   const [selectedCheckpointId, setSelectedCheckpointId] = useState<string | null>(null);
 
+  // Forecast slider state
+  const [forecastOffset, setForecastOffset] = useState(0);
+  const [weatherGrid, setWeatherGrid] = useState<NormalizedWeatherGrid | null>(null);
+  const [gridLoading, setGridLoading] = useState(false);
+  const [gridError, setGridError] = useState<string | null>(null);
+  const [gridCache, setGridCache] = useState<Record<number, NormalizedWeatherGrid>>({});
+
   const model = useMemo(
     () =>
       normalizePlanMap(response, {
@@ -61,10 +70,41 @@ export function RouteMapSection({
   const hasGeometry = model.lines.length > 0;
   const styleUrl = useMemo(() => mapStyleUrl(), []);
 
+  // Departure time from the first route's first checkpoint (all routes share same departure)
+  const departureAt = response.routes[0]?.checkpoints[0]?.eta ?? new Date().toISOString();
+
+  // Fetch weather grid when forecast offset changes
+  const fetchGrid = useCallback(
+    async (offsetHours: number) => {
+      if (gridCache[offsetHours]) {
+        setWeatherGrid(gridCache[offsetHours]);
+        return;
+      }
+      setGridLoading(true);
+      setGridError(null);
+      try {
+        const result = await fetchWeatherGrid(response.id, offsetHours);
+        const normalized = normalizeWeatherGrid(result.data);
+        setWeatherGrid(normalized);
+        setGridCache((prev) => ({ ...prev, [offsetHours]: normalized }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to load forecast';
+        setGridError(message);
+        setWeatherGrid(null);
+      } finally {
+        setGridLoading(false);
+      }
+    },
+    [response.id, gridCache]
+  );
+
+  useEffect(() => {
+    fetchGrid(forecastOffset);
+  }, [forecastOffset, fetchGrid]);
+
   // One adapter per response: create on mount/response change, destroy on
   // cleanup. The viewport fits once per response, never on selection.
   useEffect(() => {
-    setSelectedCheckpointId(null);
     setSelectedCheckpointId(null);
     if (!hasGeometry || styleUrl === '') {
       setMapStatus('unavailable');
@@ -87,8 +127,6 @@ export function RouteMapSection({
       },
       onRuntimeError: () => {
         if (cancelled) return;
-        // The map is detached with the fallback; drop the instance so a
-        // retry starts clean instead of leaking listeners.
         adapterRef.current?.destroy();
         adapterRef.current = null;
         setMapStatus('unavailable');
@@ -114,7 +152,6 @@ export function RouteMapSection({
         setMapStatus('ready');
       })
       .catch(() => {
-        // Any initialization failure degrades to the textual comparison.
         if (!cancelled) setMapStatus('unavailable');
       });
     return () => {
@@ -126,6 +163,13 @@ export function RouteMapSection({
     // flows through setSelected below so manual viewport moves survive.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [response.id, attempt, hasGeometry, styleUrl]);
+
+  // Update heatmap when weather grid changes
+  useEffect(() => {
+    if (mapStatus === 'ready') {
+      adapterRef.current?.setHeatmap(weatherGrid);
+    }
+  }, [mapStatus, weatherGrid]);
 
   // Selection emphasis without viewport refits.
   useEffect(() => {
@@ -148,6 +192,14 @@ export function RouteMapSection({
             (checkpoint) => checkpoint.checkpoint_id === selectedCheckpoint.checkpointId,
           ) ?? null);
 
+  // Clear heatmap and grid cache when route plan changes
+  useEffect(() => {
+    setForecastOffset(0);
+    setWeatherGrid(null);
+    setGridCache({});
+    setGridError(null);
+  }, [response.id]);
+
   return (
     <section aria-label="Route map">
       <Typography variant="h2" component="h2" gutterBottom>
@@ -160,7 +212,6 @@ export function RouteMapSection({
           <RouteMapFallback
             reason="map-unavailable"
             onRetry={() => {
-              // Show the mount box again before re-creating the adapter.
               setMapStatus('loading');
               setAttempt((count) => count + 1);
             }}
@@ -177,15 +228,12 @@ export function RouteMapSection({
                 borderRadius: 2,
                 overflow: 'hidden',
                 border: '1px solid #cfd8dc',
-                // Reserve the full box during load so nothing shifts.
                 visibility: mapStatus === 'loading' ? 'hidden' : 'visible',
               }}
             />
             {mapStatus === 'loading' && (
               <Skeleton
                 variant="rectangular"
-                // An aria-label on a plain span is prohibited (WCAG 4.1.2);
-                // the progressbar role is what makes the announcement legal.
                 role="progressbar"
                 aria-label="Loading map"
                 sx={{
@@ -203,6 +251,14 @@ export function RouteMapSection({
           warning below stays available as text.
         </Typography>
         <RouteMapLegend />
+        <ForecastSlider
+          value={forecastOffset}
+          onChange={setForecastOffset}
+          departureAt={departureAt}
+          loading={gridLoading}
+          disabled={mapStatus !== 'ready'}
+          error={gridError}
+        />
         <MapRouteSelection
           entries={entries}
           selectedRouteId={selectedRouteId}
