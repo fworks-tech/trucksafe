@@ -16,11 +16,14 @@ from providers.protocols import (
 from route_plans.services import (
     Endpoint,
     PlannedRoutePlan,
+    _collect_warnings,
     plan_id_for,
     plan_route_plan,
 )
+from routing.aggregation import aggregate_routes
 from routing.checkpoints import Coordinate
-from routing.recommendation import recommendation_key
+from routing.domain import Route, RouteCheckpoint
+from routing.recommendation import recommend_route, recommendation_key
 
 DEPARTURE = datetime(2026, 10, 9, 14, 0, tzinfo=UTC)
 CHI = Endpoint(coordinate=Coordinate(latitude=41.8781, longitude=-87.6298))
@@ -167,7 +170,37 @@ class _MalformedRoutingProvider:
 def test_malformed_provider_response_propagates_value_error() -> None:
     """Invalid provider data surfaces as ValueError for the view to map."""
     with pytest.raises(ValueError, match="route geometry"):
-        plan(routing_provider=_MalformedRoutingProvider())
+        plan(
+            origin=Endpoint(address="Denver, CO"),
+            routing_provider=_MalformedRoutingProvider(),
+        )
+
+
+def test_unclassified_checkpoints_warn_without_weather_loss() -> None:
+    """Weather-present but unrisked checkpoints warn as unclassified."""
+    routes = tuple(
+        Route(
+            route_id=f"route-{index}",
+            distance_miles=100.0,
+            duration_seconds=3600.0,
+            checkpoints=(
+                RouteCheckpoint(
+                    checkpoint_id="cp-1",
+                    latitude=41.0,
+                    longitude=-87.0,
+                    distance_from_origin_miles=0.0,
+                    eta=DEPARTURE,
+                    risk=None,
+                    weather_available=True,
+                ),
+            ),
+        )
+        for index in (1, 2, 3)
+    )
+    summarized = aggregate_routes(routes)
+    three = (summarized[0], summarized[1], summarized[2])
+    warnings = _collect_warnings(three, recommend_route(three))
+    assert any("unclassified checkpoint" in warning for warning in warnings)
 
 
 def test_result_carries_the_winning_ranking_key() -> None:
