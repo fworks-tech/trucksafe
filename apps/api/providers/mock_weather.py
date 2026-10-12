@@ -43,10 +43,13 @@ class MockWeatherProvider:
         """Configure scenarios and simulated failures.
 
         Args:
-            overrides: Fixed observations keyed by rounded (lat, lon);
-                a None value forces unavailable weather at that point.
+            overrides: Fixed observations keyed by (lat, lon) rounded to
+                4 decimals; a None value forces unavailable weather at
+                that point. Overrides are time-independent: the base
+                observation still varies with valid_time elsewhere.
             always_unavailable: Return None for every lookup.
-            failure: Raised on every call when set.
+            failure: Raised on every call when set; takes precedence over
+                transient_failures when both are configured.
             transient_failures: Number of leading calls that raise
                 ProviderTransientError before succeeding.
         """

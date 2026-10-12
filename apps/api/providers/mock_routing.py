@@ -51,7 +51,8 @@ class MockRoutingProvider:
         """Configure simulated failures.
 
         Args:
-            failure: Raised on every call when set.
+            failure: Raised on every call when set; takes precedence over
+                transient_failures when both are configured.
             transient_failures: Number of leading calls that raise
                 ProviderTransientError before succeeding.
         """
@@ -64,7 +65,11 @@ class MockRoutingProvider:
     def plan_routes(
         self, request: RoutePlanRequest
     ) -> tuple[RouteGeometry, RouteGeometry, RouteGeometry]:
-        """Build three deterministic variants from origin to destination."""
+        """Build three deterministic variants from origin to destination.
+
+        Variant order is stable: south, central, north. The central
+        variant follows the straight path and is always the shortest.
+        """
         self.calls += 1
         if self._failure is not None:
             raise self._failure

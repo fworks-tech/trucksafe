@@ -40,6 +40,19 @@ class RouteGeometry:
                 raise ValueError(f"{name} must be finite and positive: {value!r}")
 
 
+def _validate_coordinate(name: str, coordinate: Coordinate) -> None:
+    """Reject non-finite or out-of-range WGS84 endpoint coordinates."""
+    for axis, minimum, maximum in (
+        ("latitude", -90.0, 90.0),
+        ("longitude", -180.0, 180.0),
+    ):
+        value = getattr(coordinate, axis)
+        if not isfinite(value) or not minimum <= value <= maximum:
+            raise ValueError(
+                f"{name} {axis} must be within {minimum} to {maximum}: {value!r}"
+            )
+
+
 @dataclass(frozen=True, slots=True)
 class RoutePlanRequest:
     """Normalized input for route planning.
@@ -55,7 +68,10 @@ class RoutePlanRequest:
     departure: datetime
 
     def __post_init__(self) -> None:
-        """Require a timezone-aware departure time."""
+        """Require valid WGS84 endpoints and a timezone-aware departure."""
+        endpoints = (("origin", self.origin), ("destination", self.destination))
+        for name, coordinate in endpoints:
+            _validate_coordinate(name, coordinate)
         if not isinstance(self.departure, datetime):
             raise ValueError("departure must be a datetime")
         if self.departure.tzinfo is None or self.departure.utcoffset() is None:

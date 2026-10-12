@@ -1,6 +1,6 @@
 """Unit tests for provider errors, protocols, and mock providers."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -85,6 +85,34 @@ def test_route_plan_request_rejects_naive_departure() -> None:
         )
 
 
+def test_route_plan_request_rejects_out_of_range_coordinates() -> None:
+    """Provider input rejects coordinates no real adapter could route."""
+    with pytest.raises(ValueError, match="origin latitude"):
+        RoutePlanRequest(
+            origin=Coordinate(latitude=91.0, longitude=0.0),
+            destination=DESTINATION,
+            departure=make_time(),
+        )
+    with pytest.raises(ValueError, match="destination longitude"):
+        RoutePlanRequest(
+            origin=ORIGIN,
+            destination=Coordinate(latitude=0.0, longitude=181.0),
+            departure=make_time(),
+        )
+
+
+def test_route_plan_request_accepts_non_utc_departure() -> None:
+    """Non-UTC aware departures are valid; the instant is preserved."""
+    request = RoutePlanRequest(
+        origin=ORIGIN,
+        destination=DESTINATION,
+        departure=datetime(2026, 10, 9, 11, 0, tzinfo=UTC).astimezone(
+            timezone(timedelta(hours=-3))
+        ),
+    )
+    assert len(MockRoutingProvider().plan_routes(request)) == 3
+
+
 def test_mocks_satisfy_provider_protocols() -> None:
     """Mock adapters conform to the contracts real adapters will follow."""
     assert isinstance(MockRoutingProvider(), RoutingProvider)
@@ -166,6 +194,28 @@ def test_mock_weather_is_deterministic() -> None:
     second = provider.get_weather(41.0, -87.0, valid_time=make_time())
     assert first == second
     assert isinstance(first, WeatherObservation)
+
+
+def test_mock_weather_matches_across_equivalent_timezones() -> None:
+    """Timezone-equivalent ETAs describe the same instant and agree."""
+    provider = MockWeatherProvider()
+    utc_time = datetime(2026, 10, 9, 14, 0, tzinfo=UTC)
+    sao_paulo = utc_time.astimezone(timezone(timedelta(hours=-3)))
+    assert provider.get_weather(
+        41.0, -87.0, valid_time=utc_time
+    ) == provider.get_weather(41.0, -87.0, valid_time=sao_paulo)
+
+
+def test_mock_weather_varies_with_eta() -> None:
+    """The lookup uses time, not just coordinates (spec 002)."""
+    provider = MockWeatherProvider()
+    morning = provider.get_weather(
+        41.0, -87.0, valid_time=datetime(2026, 6, 1, 6, 0, tzinfo=UTC)
+    )
+    evening = provider.get_weather(
+        41.0, -87.0, valid_time=datetime(2026, 6, 1, 22, 0, tzinfo=UTC)
+    )
+    assert morning != evening
 
 
 def test_mock_weather_observations_are_plausible() -> None:
