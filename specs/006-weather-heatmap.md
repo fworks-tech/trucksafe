@@ -29,11 +29,11 @@ from 0 to 48 hours.
 
 ## Acceptance Criteria
 
-- [ ] Slider values range from `0` to `48`.
-- [ ] The selected forecast offset is visible to the user.
-- [ ] Heatmap colors match the documented legend.
-- [ ] Moving the slider updates the map data.
-- [ ] Repeated requests for the same offset use cached data when available.
-- [ ] The map is not recreated when only the forecast offset changes.
-- [ ] Weather provider errors result in a clear UI state.
-- [ ] The heatmap interaction is covered by an end-to-end test
+- [x] Slider values range from `0` to `48`.
+- [x] The selected forecast offset is visible to the user.
+- [x] Heatmap colors match the documented legend.
+- [x] Moving the slider updates the map data.
+- [x] Repeated requests for the same offset use cached data when available.
+- [x] The map is not recreated when only the forecast offset changes.
+- [x] Weather provider errors result in a clear UI state.
+- [x] The heatmap interaction is covered by an end-to-end test

@@ -269,27 +269,102 @@ The backend validates:
 - Checkpoint interval is `10`, `25`, or `50`.
 - Provider response structures match the expected schema before use.
 
-## Planned Endpoints (Not Implemented)
+## Weather Grid
 
-The following are deferred to later slices and must not be treated as
-available:
-
-```text
-GET /route-plans/{route_plan_id}
+```http
 GET /route-plans/{route_plan_id}/weather-grid?offset_hours={0..48}
 ```
 
-Likewise deferred: real provider adapters (with timeouts, backoff, and
-unit conversion), rate limiting, CORS policy, structured logging,
-caching, PostgreSQL/PostGIS, Redis/Celery, and the frontend.
+Retrieves the weather risk grid for a route plan at a specific forecast
+offset from departure.
 
-## OpenAPI Contract
+### Request
 
-The complete API contract is planned at:
+| Parameter | Type | Required | Description |
+|---|---|---:|---|
+| `route_plan_id` | string | Yes | Route plan identifier from the route plan response. |
+| `offset_hours` | integer | Yes | Forecast offset in hours from departure. Range `0` to `48`. |
 
-```text
-packages/contracts/openapi.yaml
+### Response
+
+`200 OK` with the weather grid payload.
+
+```json
+{
+  "route_id": "route-1",
+  "route_plan_id": "plan-abc123",
+  "forecast_start": "2026-10-09T14:00:00Z",
+  "forecast_end": "2026-10-09T15:00:00Z",
+  "cells": [
+    {
+      "cell_id": "cell-route-1-0",
+      "latitude": 39.7392,
+      "longitude": -104.9903,
+      "valid_at": "2026-10-09T14:00:00Z",
+      "risk_level": "LOW",
+      "risk_score": 1.0,
+      "risk_reasons": ["wind"],
+      "weather": {
+        "wind_mph": 15.2,
+        "rain_inches_per_hour": 0.02,
+        "snow_inches_per_hour": 0.0
+      }
+    }
+  ]
+}
 ```
 
-The file does not exist yet. Changes to the API must update this
-document until the OpenAPI contract lands.
+### Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `route_id` | string | Route identifier within the plan. |
+| `route_plan_id` | string | Route plan identifier. |
+| `forecast_start` | string | Forecast window start (UTC, ISO 8601 with `Z`). |
+| `forecast_end` | string | Forecast window end (UTC, ISO 8601 with `Z`). |
+| `cells` | array | Grid cells along the route corridor. |
+
+#### Cell Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `cell_id` | string | Stable cell identifier. |
+| `latitude` | number | WGS84 latitude. |
+| `longitude` | number | WGS84 longitude. |
+| `valid_at` | string | Forecast validity timestamp (UTC, ISO 8601 with `Z`). |
+| `risk_level` | string \| null | `LOW`, `MODERATE`, `HIGH`, `SEVERE`, `NO_TRAVEL`, or `null` when unavailable. |
+| `risk_score` | number \| null | Numeric risk score 1–5, or `null` when unavailable. |
+| `risk_reasons` | string[] | Human-readable reasons for the risk classification. |
+| `weather` | object \| null | Raw weather values when available; `null` when unavailable. |
+
+##### Weather Object Fields
+
+| Field | Type | Unit | Description |
+|---|---|---|---|
+| `wind_mph` | number | mph | Wind speed. |
+| `rain_inches_per_hour` | number | in/hr | Rain intensity. |
+| `snow_inches_per_hour` | number | in/hr | Snow intensity. |
+
+### Error Responses
+
+| Status | Error code | Meaning |
+|---|---|---|
+| `400` | `INVALID_REQUEST` | Missing or invalid `offset_hours` (must be integer 0–48). |
+| `404` | `NOT_FOUND` | Route plan not found. |
+| `422` | `UNROUTABLE` | Permanent weather provider failure. |
+| `503` | `PROVIDER_UNAVAILABLE` | Transient weather provider failures exhausted after retries. |
+
+### Behavior
+
+- The grid samples weather at each route checkpoint using the
+  checkpoint's ETA plus the forecast offset.
+- Cells with unavailable weather have `risk_level: null`, `risk_score: null`,
+  empty `risk_reasons`, and `weather: null`.
+- The grid is deterministic for the same inputs.
+- Repeated requests for the same plan and offset return identical cells.
+- The forecast window is one hour (`forecast_end = forecast_start + 1 hour`).
+- Maximum forecast horizon is 48 hours from departure.
+
+## Health
+
+...
