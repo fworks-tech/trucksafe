@@ -10,7 +10,7 @@
 
 Successful responses return JSON.
 
-Errors use the following structure:
+`400`, `422`, and `503` errors use the following structure:
 
 ```json
 {
@@ -22,6 +22,10 @@ Errors use the following structure:
 }
 ```
 
+The `request_id` matches the `X-Request-ID` response header (see Request IDs).
+Malformed JSON bodies are rejected by request parsing with a `400` response
+before validation runs.
+
 ## Create a Route Plan
 
 ```http
@@ -29,12 +33,15 @@ POST /route-plans
 Content-Type: application/json
 ```
 
+Plans three route alternatives for a truck trip, classifies weather risk
+per checkpoint, and recommends the best eligible route.
+
 ### Request
 
 ```json
 {
-  "origin": "Denver, CO",
-  "destination": "Kansas City, MO",
+  "origin": {"address": "Denver, CO"},
+  "destination": {"latitude": 39.0997, "longitude": -94.5786},
   "departure_at": "2026-10-09T14:00:00Z",
   "load_weight_lb": 35000,
   "checkpoint_interval_miles": 25
@@ -45,46 +52,62 @@ Content-Type: application/json
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
-| `origin` | string | Yes | Origin address or place name |
-| `destination` | string | Yes | Destination address or place name |
-| `departure_at` | string | Yes | ISO 8601 timestamp |
-| `load_weight_lb` | number | Yes | Truck load weight in pounds |
-| `checkpoint_interval_miles` | number | No | `10`, `25`, or `50` |
+| `origin` | object | Yes | `{"address": string}` or `{"latitude": number, "longitude": number}` |
+| `destination` | object | Yes | Same two forms as `origin` |
+| `departure_at` | string | Yes | ISO 8601 timestamp with timezone; normalized to UTC |
+| `load_weight_lb` | number | Yes | Finite truck load weight in pounds, `>= 0` |
+| `checkpoint_interval_miles` | number | No | `10`, `25`, or `50`; defaults to `25` |
+
+Endpoint rules: exactly one of `address` or coordinates per endpoint;
+addresses are non-blank, at most 200 characters; coordinates must be
+finite WGS84 values. Naive timestamps (no timezone designator) are
+rejected. Non-finite JSON numbers (`NaN`, `Infinity`) are rejected by
+JSON parsing with `400` before validation.
 
 ### Response
+
+`201 Created` for a newly computed plan, `200 OK` when an equivalent
+request repeats (same deterministic plan id, stored payload returned).
 
 ```json
 {
   "id": "route-plan-id",
   "status": "completed",
-  "recommended_route_id": "route-id",
+  "recommended_route_id": "route-1",
+  "recommendation_reason": {
+    "code": "LOWEST_RISK_RANKING",
+    "message": "Selected using the deterministic route ranking criteria.",
+    "ranking_key": [0.0, 10.0, 1.8, 7200.0],
+    "criteria": ["severe_miles", "high_miles", "average_risk_score", "duration_seconds"]
+  },
+  "warnings": [],
   "routes": [
     {
-      "id": "route-id",
-      "name": "Route 1",
+      "id": "route-1",
       "distance_miles": 604.2,
-      "duration_seconds": 32400,
-      "summary": "Primary route",
-      "geometry": {
-        "type": "LineString",
-        "coordinates": []
-      },
+      "duration_seconds": 32400.0,
+      "is_eligible": true,
       "is_recommended": true,
       "recommendation_rank": 1,
-      "metrics": {
-        "severe_miles": 0,
-        "high_miles": 28.4,
-        "average_risk_score": 1.42
+      "severe_miles": 0.0,
+      "high_miles": 28.4,
+      "no_travel_miles": 0.0,
+      "average_risk_score": 1.42,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[-104.9903, 39.7392]]
       },
       "checkpoints": [
         {
           "sequence": 1,
-          "distance_miles": 25,
+          "checkpoint_id": "cp-1",
+          "distance_miles": 0.0,
           "latitude": 39.7392,
           "longitude": -104.9903,
-          "eta": "2026-10-09T15:20:00Z",
+          "eta": "2026-10-09T14:00:00Z",
+          "weather_available": true,
           "risk_level": "LOW",
-          "risk_score": 1,
+          "risk_score": 1.0,
           "risk_reasons": ["wind"]
         }
       ]
@@ -93,96 +116,86 @@ Content-Type: application/json
 }
 ```
 
-## Retrieve a Route Plan
+Response notes:
 
-```http
-GET /route-plans/{route_plan_id}
-```
+- Exactly three routes are always returned, in provider order, each with
+  `recommendation_rank` over all routes.
+- Checkpoint ETAs are UTC ISO 8601 with a `Z` suffix.
+- `weather_available: false` means no observation existed for that
+  checkpoint; `risk_level` is then `null` and the route is ineligible.
+  Missing weather is never reported as safe.
+- `risk_score` follows the risk scale Low 1 … No Travel 5.
+- When every route is ineligible, `recommended_route_id` and
+  `recommendation_reason` are both `null` and `warnings` explains why.
+- `ranking_key` is the exact
+  `(severe_miles, high_miles, average_risk_score, duration_seconds)`
+  tuple of the selected route; lower wins every field. Eligible routes
+  always rank before ineligible ones.
+- Transient provider failures are retried up to 3 total attempts with no
+  delay; permanent failures are never retried. There is no exponential
+  backoff in this slice.
+- Routing, geocoding, and weather currently come from deterministic
+  mock providers. Mock data must never be presented as live weather.
 
-The endpoint returns the current route planning status and result.
+## Request IDs
 
-Possible statuses:
+Every response carries an `X-Request-ID` header, and every error
+envelope carries the same id in `error.request_id`.
 
-```text
-pending
-processing
-completed
-failed
-```
+- If the request sends a valid `X-Request-ID`, it is propagated.
+- Valid ids are 1–128 ASCII letters, digits, hyphens, or underscores.
+- A missing or invalid id is replaced with a generated 32-character hex
+  id. Invalid values are never reflected, so header injection is not
+  possible.
 
-## Retrieve Weather Grid
+## Status Codes and Error Codes
 
-```http
-GET /route-plans/{route_plan_id}/weather-grid?offset_hours=12
-```
+| Status | Error code | Meaning |
+|---:|---|---|
+| `201` | — | Plan created |
+| `200` | — | Equivalent repeated request; stored plan returned |
+| `400` | `INVALID_REQUEST` | Validation or domain-boundary failure (bad fields, naive timestamp, out-of-range coordinates, invalid route data) |
+| `422` | `UNROUTABLE` | Permanent provider failure (for example identical origin and destination) |
+| `503` | `PROVIDER_UNAVAILABLE` | Transient provider failures exhausted after retries |
 
-### Query Parameters
-
-| Parameter | Type | Description |
-|---|---|---|
-| `offset_hours` | integer | Forecast offset from `0` to `48` |
-
-### Response
-
-```json
-{
-  "route_plan_id": "route-plan-id",
-  "offset_hours": 12,
-  "points": [
-    {
-      "latitude": 39.7392,
-      "longitude": -104.9903,
-      "valid_at": "2026-10-10T02:00:00Z",
-      "risk_level": "HIGH",
-      "risk_score": 3,
-      "wind_mph": 42,
-      "rain_inches_per_hour": 0.1,
-      "snow_inches_per_hour": 0
-    }
-  ]
-}
-```
-
-## Health Check
-
-```http
-GET /health
-```
-
-Used to determine whether the application process is running.
-
-## Readiness Check
-
-```http
-GET /ready
-```
-
-Used to determine whether required dependencies are available.
-
-Readiness checks may include:
-
-- Database connectivity.
-- Redis connectivity.
-- Required configuration.
-- External provider configuration.
+Unexpected server errors use Django's default `500` handling and never
+include stack traces, provider payloads, or credentials in responses.
 
 ## Validation Rules
 
-The backend must validate:
+The backend validates:
 
-- Origin and destination are not empty.
-- Input strings have a maximum length.
-- Departure time is a valid ISO 8601 timestamp.
+- Origin and destination are present, in exactly one accepted form.
+- Addresses are non-blank and at most 200 characters.
+- Coordinates are finite WGS84 values.
+- Departure time is a valid ISO 8601 timestamp with a timezone.
 - Load weight is finite and non-negative.
 - Checkpoint interval is `10`, `25`, or `50`.
-- External provider responses match the expected schema.
+- Provider response structures match the expected schema before use.
+
+## Planned Endpoints (Not Implemented)
+
+The following are deferred to later slices and must not be treated as
+available:
+
+```text
+GET /route-plans/{route_plan_id}
+GET /route-plans/{route_plan_id}/weather-grid?offset_hours={0..48}
+GET /health
+GET /ready
+```
+
+Likewise deferred: real provider adapters (with timeouts, backoff, and
+unit conversion), rate limiting, CORS policy, structured logging,
+caching, PostgreSQL/PostGIS, Redis/Celery, and the frontend.
 
 ## OpenAPI Contract
 
-The complete API contract is maintained in:
+The complete API contract is planned at:
 
 ```text
 packages/contracts/openapi.yaml
 ```
 
-Changes to the API should update the OpenAPI document and generated frontend types.
+The file does not exist yet. Changes to the API must update this
+document until the OpenAPI contract lands.

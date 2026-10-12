@@ -19,32 +19,41 @@ class RoutingProvider:
     def geocode(self, address: str):
         ...
 
-    def get_routes(self, origin, destination):
+    def plan_routes(self, request):
         ...
 
 
 class WeatherProvider:
-    def get_hourly_forecast(
+    def get_weather(
         self,
         latitude: float,
         longitude: float,
-        start_at,
-        end_at,
+        *,
+        valid_time,
     ):
         ...
 ```
 
+`plan_routes` returns exactly three normalized route geometries;
+`get_weather` returns one normalized observation, or `None` when weather
+is unavailable.
+
 ## Responsibilities of Adapters
 
-Adapters must:
+Real adapters must:
 
 - Authenticate requests.
 - Apply timeouts.
-- Retry transient failures.
+- Retry transient failures with backoff.
 - Validate responses.
 - Convert units.
 - Normalize provider-specific fields.
 - Return internal application models.
+
+The current deterministic mocks implement the same protocols without I/O:
+no auth, timeouts, backoff, or unit conversion. They validate normalized
+data at the protocol boundary, retry transient failures without delay,
+and never require credentials.
 
 ## Rationale
 

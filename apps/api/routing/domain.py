@@ -191,6 +191,33 @@ class Route:
         return replace(self, summary=summary)
 
 
+#: Ranking criteria in documented priority order.
+RANKING_CRITERIA: tuple[str, ...] = (
+    "severe_miles",
+    "high_miles",
+    "average_risk_score",
+    "duration_seconds",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class RecommendationReason:
+    """Machine-readable explanation for a recommended route.
+
+    Attributes:
+        code: Stable reason code for the selection.
+        message: Client-safe explanation of the selection.
+        ranking_key: Exact ranking key of the selected route, in
+            RANKING_CRITERIA order. Lower wins every field.
+        criteria: Ranking criteria in priority order.
+    """
+
+    code: str
+    message: str
+    ranking_key: tuple[float, float, float, float]
+    criteria: tuple[str, ...] = RANKING_CRITERIA
+
+
 @dataclass(frozen=True, slots=True)
 class RecommendationResult:
     """Result of deterministic route recommendation.
@@ -201,11 +228,14 @@ class RecommendationResult:
         ranked_route_ids: All route ids, eligible first, each group in
             ranking-key order (stable input order on ties).
         all_routes_ineligible: True when no route was recommendable.
+        reason: Explanation for the selected route, or None when no
+            route was selected.
     """
 
     recommended_route_id: str | None
     ranked_route_ids: tuple[str, ...]
     all_routes_ineligible: bool
+    reason: RecommendationReason | None = None
 
     @property
     def has_recommendation(self) -> bool:

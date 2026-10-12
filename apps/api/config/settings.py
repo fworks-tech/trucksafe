@@ -93,6 +93,7 @@ INSTALLED_APPS = [
     "rest_framework",
     # Local applications
     "risk.apps.RiskConfig",
+    "route_plans.apps.RoutePlansConfig",
 ]
 
 
@@ -104,6 +105,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "route_plans.middleware.RequestIdMiddleware",
 ]
 
 

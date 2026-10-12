@@ -82,6 +82,10 @@ class RoutePlanRequest:
 class RoutingProvider(Protocol):
     """Plans candidate routes between two coordinates."""
 
+    def geocode(self, address: str) -> Coordinate:
+        """Resolve a place name to WGS84 coordinates."""
+        ...
+
     def plan_routes(
         self, request: RoutePlanRequest
     ) -> tuple[RouteGeometry, RouteGeometry, RouteGeometry]:

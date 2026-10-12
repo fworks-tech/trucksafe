@@ -272,3 +272,69 @@ def test_recommendation_rejects_empty_input() -> None:
         match="At least one route",
     ):
         recommend_route(())
+
+
+def test_recommendation_explains_the_winner() -> None:
+    """The result carries the exact ranking key of the selected route."""
+    route_a = make_route(
+        "route-a",
+        make_summary(severe_miles=10.0, high_miles=4.0),
+    )
+    route_b = make_route(
+        "route-b",
+        make_summary(severe_miles=2.0, high_miles=9.0),
+    )
+
+    result = recommend_route((route_a, route_b))
+    reason = result.reason
+
+    assert reason is not None
+    assert reason.code == "LOWEST_RISK_RANKING"
+    assert reason.message
+    assert reason.ranking_key == recommendation_key(route_b)
+    assert reason.ranking_key == (2.0, 9.0, 1.0, 7200.0)
+    assert list(reason.criteria) == [
+        "severe_miles",
+        "high_miles",
+        "average_risk_score",
+        "duration_seconds",
+    ]
+
+
+def test_recommendation_reason_is_deterministic() -> None:
+    """Repeated recommendations explain themselves identically."""
+    routes = (
+        make_route("route-a", make_summary(severe_miles=3.0)),
+        make_route("route-b", make_summary(severe_miles=7.0)),
+    )
+
+    first = recommend_route(routes)
+    second = recommend_route(routes)
+
+    assert first.reason == second.reason
+
+
+def test_recommendation_reason_follows_tie_order() -> None:
+    """Equal keys keep input order and the reason names the first route."""
+    route_a = make_route("route-a", make_summary())
+    route_b = make_route("route-b", make_summary())
+
+    result = recommend_route((route_a, route_b))
+
+    assert result.recommended_route_id == "route-a"
+    assert result.reason is not None
+    assert result.reason.ranking_key == recommendation_key(route_a)
+
+
+def test_all_ineligible_routes_have_no_reason() -> None:
+    """No eligible route means no selection and no explanation."""
+    routes = (
+        make_route("route-a", make_summary(is_eligible=False)),
+        make_route("route-b", make_summary(is_eligible=False)),
+    )
+
+    result = recommend_route(routes)
+
+    assert result.recommended_route_id is None
+    assert result.all_routes_ineligible is True
+    assert result.reason is None

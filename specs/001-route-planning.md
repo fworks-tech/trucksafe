@@ -17,23 +17,29 @@ departure date/time, and load weight.
 
 - The application must validate all required fields.
 - The backend must validate the request independently from the frontend.
-- The application must geocode the origin and destination.
-- The application must request three route alternatives from the routing provider.
-- Each route must include distance, duration, summary, and route geometry.
+- The application must geocode address endpoints and accept coordinates directly.
+- The backend must request three route alternatives from the routing provider.
+- Each route must include distance, duration, risk summary, and route geometry.
 - The application must preserve timestamps in UTC internally.
 - The application must return a deterministic route plan identifier.
+- Equivalent repeated requests must return the stored plan (`200`) instead of recomputing.
 
 ## Request Schema
 
 ```json
 {
-  "origin": "Denver, CO",
-  "destination": "Kansas City, MO",
+  "origin": {"address": "Denver, CO"},
+  "destination": {"latitude": 39.0997, "longitude": -94.5786},
   "departure_at": "2026-10-09T14:00:00Z",
   "load_weight_lb": 35000,
   "checkpoint_interval_miles": 25
 }
 ```
+
+Each endpoint accepts exactly one form: `{"address": string}` (non-blank,
+at most 200 characters) or `{"latitude": number, "longitude": number}`
+(finite WGS84). `departure_at` must carry a timezone and is normalized to
+UTC. `checkpoint_interval_miles` is optional and defaults to `25`.
 
 ## Acceptance Criteria
 

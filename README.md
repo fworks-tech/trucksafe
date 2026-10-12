@@ -55,24 +55,23 @@ The project is being implemented incrementally using vertical slices.
   - Cumulative-distance ETA interpolation along route geometry
 - Unit tests for every threshold, load rule, invalid input, checkpoint interval boundary, and destination inclusion
 - Property-based tests (Hypothesis) for risk monotonicity and checkpoint invariants
+- Framework-independent route aggregation and deterministic route recommendation in `routing/`
+- Deterministic mocked routing, geocoding, and weather providers behind protocols in `providers/`
+- Route-planning API slice in `route_plans/`: `POST /api/v1/route-plans` with validation, orchestration, deterministic persistence, and safe error envelopes
 - Settings parsing tests for debug flags, allowed hosts, and the secret-key guard
 
-At the time of this change, the backend test suite contains 114 passing tests.
-
-### In Progress
-
-- Route recommendation engine and ranking
-- Route-planning API endpoint (`POST /api/v1/route-plans`)
+Run the backend suite with `python -m pytest` from `apps/api` (see Testing Strategy).
 
 ### Planned (Not Implemented Yet)
 
-- Routing and weather provider adapters (mocked provider first)
 - React frontend: form, route cards, map, heatmap, forecast slider
 - OpenAPI contract in `packages/contracts/openapi.yaml`
+- Real routing and weather provider adapters (timeouts, backoff, unit conversion)
+- `GET` route-plan retrieval and weather-grid endpoints
 - PostgreSQL/PostGIS persistence, Redis caching, Celery tasks
 - Docker, Docker Compose, CI/CD workflows
 - Health and readiness endpoints
-- Integration tests, API contract tests, and Playwright end-to-end tests
+- API contract tests and Playwright end-to-end tests
 
 **No external routing or weather provider is connected yet.** The backend currently runs on Django defaults with SQLite and needs no external services or credentials.
 
@@ -84,9 +83,9 @@ At the time of this change, the backend test suite contains 114 passing tests.
 
 - Python 3.11+
 - Django 4.2.x
-- Django REST Framework (installed and registered; views and serializers not yet implemented)
+- Django REST Framework (installed and registered; route-plan views and serializers implemented)
 - Python dataclasses for framework-independent domain objects
-- pytest, pytest-django, pytest-cov
+- pytest, pytest-django, pytest-cov, Hypothesis
 - Ruff, mypy
 
 ### Frontend (Planned)
@@ -143,10 +142,28 @@ At the time of this change, the backend test suite contains 114 passing tests.
 │   │   │   ├── schemas.py
 │   │   │   └── tests/
 │   │   ├── routing/                # Checkpoint and ETA domain (framework-independent)
+  │   │   ├── aggregation.py
+  │   │   ├── checkpoints.py
+  │   │   ├── domain.py
+  │   │   ├── recommendation.py
+  │   │   └── tests/
+  │   ├── providers/              # Provider protocols and deterministic mocks
+  │   │   ├── protocols.py
+  │   │   ├── errors.py
+  │   │   ├── mock_routing.py
+  │   │   ├── mock_weather.py
+  │   │   └── tests/
+  │   ├── route_plans/            # POST /api/v1/route-plans slice
+  │   │   ├── services.py         # Django-free orchestration
+  │   │   ├── serializers.py
+  │   │   ├── views.py
+  │   │   ├── middleware.py
+  │   │   ├── models.py
+  │   │   └── tests/
 │   │   ├── manage.py
 │   │   ├── pyproject.toml
 │   │   └── Dockerfile              # Placeholder, not yet configured
-│   └── web/                        # React frontend (planned, currently empty)
+  │   └── web/                        # React frontend (planned, not yet created)
 ├── docs/                           # Architecture and technical documents
 ├── specs/                          # Feature specifications
 ├── .env.example
@@ -160,6 +177,8 @@ The backend intentionally uses flat packages:
 apps/api/config
 apps/api/risk
 apps/api/routing
+apps/api/providers
+apps/api/route_plans
 ```
 
 instead of a duplicated structure such as:
@@ -280,7 +299,7 @@ mypy .                            # Run static type checking
 
 ### Frontend
 
-Frontend commands are planned. `apps/web` is an empty placeholder directory.
+Frontend commands are planned. `apps/web` does not exist yet.
 
 ---
 
@@ -484,7 +503,7 @@ The API will use versioned endpoints under:
 /api/v1
 ```
 
-> The API contract is planned. No route-planning endpoints exist yet. The contract below is defined in [docs/api.md](docs/api.md) and will be implemented in `packages/contracts/openapi.yaml`.
+> `POST /api/v1/route-plans` is implemented. The contract below is defined in [docs/api.md](docs/api.md); the OpenAPI document in `packages/contracts/openapi.yaml` is still planned.
 
 ### Create a Route Plan
 
@@ -496,50 +515,45 @@ Request:
 
 ```json
 {
-  "origin": "Denver, CO",
-  "destination": "Kansas City, MO",
+  "origin": {"address": "Denver, CO"},
+  "destination": {"latitude": 39.0997, "longitude": -94.5786},
   "departure_at": "2026-10-09T14:00:00Z",
   "load_weight_lb": 35000,
   "checkpoint_interval_miles": 25
 }
 ```
 
+Each endpoint accepts exactly one form: `{"address": string}` (non-blank,
+at most 200 characters) or `{"latitude": number, "longitude": number}`
+(finite WGS84 coordinates).
+
 Validation rules:
 
 - `origin` is required.
 - `destination` is required.
-- `origin` and `destination` must not be identical.
-- `departure_at` must be a valid UTC ISO 8601 timestamp.
+- `departure_at` must be a valid ISO 8601 timestamp with a timezone; it is normalized to UTC and naive timestamps are rejected.
 - `load_weight_lb` must be finite and greater than or equal to zero.
-- `checkpoint_interval_miles` must be `10`, `25`, or `50`.
+- `checkpoint_interval_miles` must be `10`, `25`, or `50`; it is optional and defaults to `25`.
+- Identical origin and destination coordinates cannot be routed (`422`).
 
-Successful response: `201 Created`.
+Successful responses return exactly three routes with UTC checkpoint ETAs,
+per-checkpoint weather availability, risk levels, eligibility, warnings,
+and a deterministic recommendation with its ranking key. First request:
+`201 Created`. Equivalent repeated request: `200 OK` with the stored plan.
 
-### Retrieve a Route Plan
+Every response carries an `X-Request-ID` header (a valid client-provided
+id is propagated, otherwise a server id is generated); error envelopes
+carry the same id.
+
+### Planned Endpoints
+
+`GET` route-plan retrieval, weather-grid, health, and readiness endpoints
+are not implemented yet:
 
 ```http
 GET /api/v1/route-plans/{route_plan_id}
-```
-
-The response includes the request inputs, the three route alternatives, route geometries, route summaries, checkpoints, checkpoint ETAs, weather observations, risk classifications, the recommendation result, and provider or data availability warnings.
-
-### Retrieve Weather Grid Data
-
-```http
 GET /api/v1/route-plans/{route_plan_id}/weather-grid?offset_hours=12
-```
-
-The `offset_hours` parameter supports values from `0` through `48`.
-
-### Health Check
-
-```http
 GET /api/v1/health
-```
-
-### Readiness Check
-
-```http
 GET /api/v1/ready
 ```
 
@@ -561,26 +575,29 @@ Errors use a consistent envelope:
 
 | Status | Meaning |
 | ---: | --- |
-| `200` | Successful request |
-| `201` | Resource created |
-| `400` | Invalid request |
-| `404` | Resource not found |
-| `422` | Valid request format but invalid domain value |
-| `502` | External provider failure |
-| `503` | Service temporarily unavailable |
-| `500` | Unexpected server error |
+| `201` | Plan created |
+| `200` | Equivalent repeated request; stored plan returned |
+| `400` | Invalid request (`INVALID_REQUEST`) |
+| `422` | Valid request format but unroutable (`UNROUTABLE`) |
+| `503` | Transient provider failures exhausted (`PROVIDER_UNAVAILABLE`) |
+
+Unexpected errors use Django's default `500` handling. `GET` retrieval,
+weather-grid, health, and readiness endpoints are planned; no `404` or
+`502` mappings exist yet.
 
 ---
 
-## Provider Integrations (Planned)
+## Provider Integrations
 
-Routing, geocoding, and weather providers will be accessed through adapter interfaces.
+Routing, geocoding, and weather access go through adapter interfaces
+(`RoutingProvider`, `WeatherProvider`) with deterministic mocks for
+development and tests.
 
-Provider adapters will be responsible for:
+Provider adapters are responsible for:
 
 - Building provider requests
-- Applying connection and read timeouts
-- Retrying transient failures with exponential backoff
+- Applying connection and read timeouts (real adapters; mocks perform no I/O)
+- Retrying transient failures, at most 3 total attempts, without delay (exponential backoff is deferred to real adapters)
 - Normalizing and validating provider responses
 - Mapping provider errors to explicit unavailable or degraded states
 - Supporting mocks in automated tests
@@ -595,7 +612,9 @@ During development, mocked provider responses will be used. Mock data must never
 
 ### Currently Implemented
 
-Backend unit and property-based tests cover the weather risk engine and checkpoint generation:
+Backend unit, property-based, and integration tests cover the weather
+risk engine, checkpoint generation, route aggregation and recommendation,
+mock providers, and the route-planning endpoint:
 
 - Every wind, rain, and snow threshold boundary
 - Values immediately below, at, and above every threshold
@@ -609,8 +628,13 @@ Backend unit and property-based tests cover the weather risk engine and checkpoi
 - Rejection of invalid intervals, durations, coordinates, and naive timestamps
 - Property-based monotonicity of risk against wind speed and load weight
 - Property-based checkpoint ordering, destination inclusion, and non-decreasing ETAs
+- Route aggregation (mile attribution, eligibility, missing-weather handling)
+- Deterministic recommendation ranking, ties, and all-ineligible results
+- Mock routing and weather behavior, including transient/permanent failures
+- `POST /api/v1/route-plans` validation, persistence/idempotency, error envelopes, and request IDs
 
-The risk and routing domain packages currently have 100% test coverage.
+Coverage is near-complete across `risk`, `routing`, `providers`, and
+`route_plans` (remaining gaps are defensive-validation branches).
 
 Run them with:
 
@@ -622,8 +646,6 @@ python -m pytest --cov=risk
 
 ### Planned
 
-- Unit tests for route recommendation and ranking
-- Integration tests with mocked routing and weather providers
 - API contract tests against the OpenAPI document
 - Playwright end-to-end tests for the primary user journey
 - Property-based tests (Hypothesis) for route ranking invariants
@@ -635,7 +657,7 @@ python -m pytest --cov=risk
 - Backend validation for every request
 - Secrets stored outside source control
 - Private provider credentials kept server-side
-- External provider timeouts and retries
+- Bounded retries for transient provider failures
 - Structured error responses without stack traces
 - Restricted `ALLOWED_HOSTS` in production
 - Rate limiting for route-planning requests (planned)

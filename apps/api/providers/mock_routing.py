@@ -5,6 +5,7 @@ variants) with fixed geometry derived from the request. No network,
 no credentials, no randomness.
 """
 
+from hashlib import sha256
 from math import asin, cos, radians, sin, sqrt
 
 from routing.checkpoints import Coordinate
@@ -17,6 +18,17 @@ _MOCK_SPEED_MPH = 55.0
 _POINTS_PER_ROUTE = 5
 _LATERAL_OFFSETS_DEGREES = (-0.5, 0.0, 0.5)
 _DISTANCE_FACTORS = (1.12, 1.0, 1.18)
+
+_KNOWN_ADDRESSES = {
+    "denver, co": Coordinate(latitude=39.7392, longitude=-104.9903),
+    "kansas city, mo": Coordinate(latitude=39.0997, longitude=-94.5786),
+    "chicago, il": Coordinate(latitude=41.8781, longitude=-87.6298),
+    "detroit, mi": Coordinate(latitude=42.3314, longitude=-83.0458),
+}
+
+# Fallback geocoding box (continental US) for addresses outside the table.
+_FALLBACK_LATITUDE = (25.0, 48.0)
+_FALLBACK_LONGITUDE = (-125.0, -67.0)
 
 
 def _haversine_miles(origin: Coordinate, destination: Coordinate) -> float:
@@ -61,6 +73,38 @@ class MockRoutingProvider:
         self._failure = failure
         self._transient_failures = transient_failures
         self.calls = 0
+
+    def geocode(self, address: str) -> Coordinate:
+        """Resolve a known address or deterministically derive coordinates.
+
+        Known addresses resolve to fixed coordinates. Any other non-blank
+        address derives stable coordinates from its SHA-256 digest, so
+        repeated lookups agree without network access.
+
+        The fallback does not validate that an address is real or
+        deliverable: gibberish resolves instead of failing. A real
+        geocoding adapter must reject unknown addresses; only the mock
+        is this permissive.
+        """
+        self.calls += 1
+        if self._failure is not None:
+            raise self._failure
+        if self._transient_failures > 0:
+            self._transient_failures -= 1
+            raise ProviderTransientError("mock transient geocoding failure")
+        key = address.strip().lower()
+        if not key:
+            raise ProviderPermanentError("mock provider cannot geocode a blank address")
+        if key in _KNOWN_ADDRESSES:
+            return _KNOWN_ADDRESSES[key]
+        digest = sha256(key.encode("utf-8")).digest()
+        latitude = _FALLBACK_LATITUDE[0] + (
+            int.from_bytes(digest[:8], "big") / 2**64
+        ) * (_FALLBACK_LATITUDE[1] - _FALLBACK_LATITUDE[0])
+        longitude = _FALLBACK_LONGITUDE[0] + (
+            int.from_bytes(digest[8:16], "big") / 2**64
+        ) * (_FALLBACK_LONGITUDE[1] - _FALLBACK_LONGITUDE[0])
+        return Coordinate(latitude=latitude, longitude=longitude)
 
     def plan_routes(
         self, request: RoutePlanRequest
