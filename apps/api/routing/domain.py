@@ -10,8 +10,12 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import datetime
 from math import isfinite
+from typing import TYPE_CHECKING
 
 from risk.schemas import RiskLevel, RiskResult
+
+if TYPE_CHECKING:
+    from routing.segments import EnrichedRouteGeometry
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,6 +165,7 @@ class Route:
     duration_seconds: float
     checkpoints: tuple[RouteCheckpoint, ...]
     summary: RouteSummary | None = None
+    enriched_geometry: EnrichedRouteGeometry | None = None
 
     def __post_init__(self) -> None:
         """Enforce id, finite non-negative totals, and ordered checkpoints."""

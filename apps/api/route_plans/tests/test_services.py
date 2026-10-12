@@ -228,3 +228,33 @@ def test_ineligible_plan_carries_no_reason() -> None:
     result = plan(weather_provider=MockWeatherProvider(always_unavailable=True))
     assert result.recommendation.recommended_route_id is None
     assert result.recommendation.reason is None
+
+
+def test_routes_carry_enriched_geometry_with_segments() -> None:
+    """Happy path produces enriched geometry and risk segments per route."""
+    result = plan()
+    for route in result.routes:
+        assert route.enriched_geometry is not None
+        assert len(route.enriched_geometry.segments) > 0
+        for segment in route.enriched_geometry.segments:
+            assert segment.end_index > segment.start_index
+            assert segment.risk is not None
+
+
+def test_unavailable_weather_produces_null_segment_risk() -> None:
+    """Routes with unavailable weather still carry segments with null risk."""
+    result = plan(weather_provider=MockWeatherProvider(always_unavailable=True))
+    for route in result.routes:
+        if route.enriched_geometry is not None:
+            for segment in route.enriched_geometry.segments:
+                assert segment.risk is None
+
+
+def test_enriched_geometry_preserves_endpoints() -> None:
+    """Enriched geometry starts at origin and ends at destination."""
+    result = plan()
+    for route, geometry in zip(result.routes, result.geometries, strict=True):
+        assert route.enriched_geometry is not None
+        enriched = route.enriched_geometry.points
+        assert enriched[0] == geometry.points[0]
+        assert enriched[-1] == geometry.points[-1]
