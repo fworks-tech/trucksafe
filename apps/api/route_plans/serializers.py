@@ -12,6 +12,7 @@ from rest_framework import serializers
 
 from routing.checkpoints import Coordinate
 from routing.domain import RecommendationReason, Route, RouteCheckpoint
+from routing.weather_grid import WeatherGrid
 
 from .services import Endpoint, PlannedRoutePlan
 
@@ -195,4 +196,33 @@ def _checkpoint_payload(sequence: int, checkpoint: RouteCheckpoint) -> dict[str,
         "risk_level": risk.level.name if risk is not None else None,
         "risk_score": float(risk.score) if risk is not None else None,
         "risk_reasons": list(risk.reasons) if risk is not None else [],
+    }
+
+
+def build_weather_grid_response(grid: WeatherGrid) -> dict[str, Any]:
+    """Render the weather grid as the response payload."""
+    return {
+        "route_id": grid.route_id,
+        "route_plan_id": grid.route_plan_id,
+        "forecast_start": format_eta(grid.forecast_start),
+        "forecast_end": format_eta(grid.forecast_end),
+        "cells": [
+            {
+                "cell_id": cell.cell_id,
+                "latitude": cell.latitude,
+                "longitude": cell.longitude,
+                "valid_at": format_eta(cell.valid_at),
+                "risk_level": cell.risk_level.name if cell.risk_level is not None else None,
+                "risk_score": cell.risk_score,
+                "risk_reasons": list(cell.risk_reasons),
+                "weather": {
+                    "wind_mph": cell.wind_mph,
+                    "rain_inches_per_hour": cell.rain_inches_per_hour,
+                    "snow_inches_per_hour": cell.snow_inches_per_hour,
+                }
+                if cell.wind_mph is not None
+                else None,
+            }
+            for cell in grid.cells
+        ],
     }
