@@ -36,4 +36,4 @@ from 0 to 48 hours.
 - [ ] Repeated requests for the same offset use cached data when available.
 - [ ] The map is not recreated when only the forecast offset changes.
 - [ ] Weather provider errors result in a clear UI state.
-- [ ] The heatmap interaction is covered by an end-to-end test.
+- [ ] The heatmap interaction is covered by an end-to-end test
