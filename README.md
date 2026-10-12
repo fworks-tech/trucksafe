@@ -90,7 +90,7 @@ Run the backend suite with `python -m pytest` from `apps/api` (see Testing Strat
 - pytest, pytest-django, pytest-cov, Hypothesis
 - Ruff, mypy
 
-### Frontend (Planned)
+### Frontend (First Slice Implemented)
 
 - React
 - TypeScript
@@ -98,8 +98,11 @@ Run the backend suite with `python -m pytest` from `apps/api` (see Testing Strat
 - TanStack Query
 - React Hook Form
 - Zod
-- Tailwind CSS
-- Mapbox GL JS
+- Material UI (+ Emotion)
+- Vitest + React Testing Library + MSW, Playwright, axe-core
+
+Map, heatmap, forecast slider, and Mapbox GL JS remain planned. See
+`apps/web/README.md` for setup and scope.
 
 ### Data and Infrastructure (Planned)
 
@@ -170,7 +173,7 @@ Run the backend suite with `python -m pytest` from `apps/api` (see Testing Strat
 │   │   ├── manage.py
 │   │   ├── pyproject.toml
 │   │   └── Dockerfile              # Placeholder, not yet configured
-  │   └── web/                        # React frontend (planned, not yet created)
+  │   └── web/                        # React frontend (first slice implemented)
 ├── docs/                           # Architecture and technical documents
 ├── specs/                          # Feature specifications
 ├── .env.example
@@ -208,7 +211,9 @@ from risk.engine import calculate_risk
 - Git
 - Python 3.11 or newer
 
-Not required for the current foundation: Node.js, Docker, PostgreSQL, Redis. They become relevant when the planned frontend and infrastructure are implemented.
+The frontend slice additionally requires Node.js 20 or newer. Not required
+yet: Docker, PostgreSQL, Redis. They become relevant when the planned
+infrastructure is implemented.
 
 ---
 
@@ -313,7 +318,17 @@ mypy .                            # Run static type checking
 
 ### Frontend
 
-Frontend commands are planned. `apps/web` does not exist yet.
+```sh
+cd apps/web
+npm ci                  # Install frontend dependencies
+npm run dev             # Start the Vite dev server (needs the backend on :8000)
+npm test                # Run frontend unit/component/integration tests
+npm run e2e             # Run Playwright end-to-end tests (needs the backend on :8000)
+npm run build           # Typecheck and build for production
+```
+
+See `apps/web/README.md` for environment configuration, proxy behavior,
+and the current frontend scope.
 
 ---
 
