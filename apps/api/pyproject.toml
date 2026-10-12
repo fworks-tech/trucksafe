@@ -25,13 +25,13 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["config", "config.*", "risk", "risk.*", "routing", "routing.*", "providers", "providers.*"]
+include = ["config", "config.*", "risk", "risk.*", "routing", "routing.*", "providers", "providers.*", "route_plans", "route_plans.*"]
 
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
 pythonpath = ["."]
-testpaths = ["config/tests", "risk/tests", "routing/tests", "providers/tests"]
+testpaths = ["config/tests", "risk/tests", "routing/tests", "providers/tests", "route_plans/tests"]
 
 
 [tool.ruff]
@@ -48,3 +48,4 @@ python_version = "3.11"
 check_untyped_defs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
+exclude = "migrations/"
