@@ -1,7 +1,8 @@
 """HTTP layer for POST /api/v1/route-plans.
 
 Views translate HTTP into service calls and domain results into
-responses. Provider errors map to the documented error envelope;
+responses. Provider errors map to the documented error envelope, and
+domain-boundary validation failures (ValueError) map to 400; truly
 unexpected exceptions propagate to Django's 500 handling.
 """
 
@@ -48,16 +49,16 @@ class RoutePlanCreateView(APIView):
     def post(self, request: Request) -> Response:
         """Validate, plan with mock providers, persist, and return the plan."""
         request_id = getattr(request, "request_id", uuid.uuid4().hex)
-        serializer = RoutePlanRequestSerializer(data=request.data)
-        if not serializer.is_valid():
-            return error_response(
-                "INVALID_REQUEST",
-                first_error_message(serializer.errors),
-                HTTP_400_BAD_REQUEST,
-                request_id,
-            )
-        validated = serializer.validated_data
         try:
+            serializer = RoutePlanRequestSerializer(data=request.data)
+            if not serializer.is_valid():
+                return error_response(
+                    "INVALID_REQUEST",
+                    first_error_message(serializer.errors),
+                    HTTP_400_BAD_REQUEST,
+                    request_id,
+                )
+            validated = serializer.validated_data
             result = plan_route_plan(
                 origin=validated["origin"],
                 destination=validated["destination"],
@@ -79,6 +80,13 @@ class RoutePlanCreateView(APIView):
                 "PROVIDER_UNAVAILABLE",
                 f"Routing or weather providers are unavailable: {exc}",
                 HTTP_503_SERVICE_UNAVAILABLE,
+                request_id,
+            )
+        except ValueError as exc:
+            return error_response(
+                "INVALID_REQUEST",
+                f"Invalid route data: {exc}",
+                HTTP_400_BAD_REQUEST,
                 request_id,
             )
         payload = build_response(result)

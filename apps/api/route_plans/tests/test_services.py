@@ -7,7 +7,12 @@ import pytest
 from providers.errors import ProviderPermanentError, ProviderTransientError
 from providers.mock_routing import MockRoutingProvider
 from providers.mock_weather import MockWeatherProvider
-from providers.protocols import RoutingProvider, WeatherProvider
+from providers.protocols import (
+    RouteGeometry,
+    RoutePlanRequest,
+    RoutingProvider,
+    WeatherProvider,
+)
 from route_plans.services import (
     Endpoint,
     PlannedRoutePlan,
@@ -15,6 +20,7 @@ from route_plans.services import (
     plan_route_plan,
 )
 from routing.checkpoints import Coordinate
+from routing.recommendation import recommendation_key
 
 DEPARTURE = datetime(2026, 10, 9, 14, 0, tzinfo=UTC)
 CHI = Endpoint(coordinate=Coordinate(latitude=41.8781, longitude=-87.6298))
@@ -128,3 +134,64 @@ def test_endpoint_requires_exactly_one_form() -> None:
         Endpoint(address="Denver, CO", coordinate=CHI.coordinate)
     with pytest.raises(ValueError, match="blank"):
         Endpoint(address="   ")
+
+
+@pytest.mark.parametrize("load", [float("inf"), float("-inf"), float("nan")])
+def test_non_finite_load_weight_is_rejected(load: float) -> None:
+    """Non-finite loads are caller errors, not provider failures."""
+    with pytest.raises(ValueError, match="load_weight_lb"):
+        plan(load_weight_lb=load)
+
+
+def test_out_of_range_coordinates_are_rejected() -> None:
+    """Coordinates outside WGS84 fail at the request boundary."""
+    far_north = Endpoint(coordinate=Coordinate(latitude=91.0, longitude=0.0))
+    with pytest.raises(ValueError, match="latitude"):
+        plan(origin=far_north)
+
+
+class _MalformedRoutingProvider:
+    """Simulates a provider whose own response validation failed."""
+
+    def geocode(self, address: str) -> Coordinate:
+        """Delegate geocoding to the deterministic mock."""
+        return MockRoutingProvider().geocode(address)
+
+    def plan_routes(
+        self, request: RoutePlanRequest
+    ) -> tuple[RouteGeometry, RouteGeometry, RouteGeometry]:
+        """Reject the response the way a validating adapter would."""
+        raise ValueError("route geometry needs at least origin and destination")
+
+
+def test_malformed_provider_response_propagates_value_error() -> None:
+    """Invalid provider data surfaces as ValueError for the view to map."""
+    with pytest.raises(ValueError, match="route geometry"):
+        plan(routing_provider=_MalformedRoutingProvider())
+
+
+def test_result_carries_the_winning_ranking_key() -> None:
+    """The recommendation reason names the exact key that won."""
+    result = plan()
+    reason = result.recommendation.reason
+    assert reason is not None
+    assert reason.code == "LOWEST_RISK_RANKING"
+    winner = next(
+        route
+        for route in result.routes
+        if route.route_id == result.recommendation.recommended_route_id
+    )
+    assert reason.ranking_key == recommendation_key(winner)
+    assert list(reason.criteria) == [
+        "severe_miles",
+        "high_miles",
+        "average_risk_score",
+        "duration_seconds",
+    ]
+
+
+def test_ineligible_plan_carries_no_reason() -> None:
+    """Total outage selects nothing and explains nothing."""
+    result = plan(weather_provider=MockWeatherProvider(always_unavailable=True))
+    assert result.recommendation.recommended_route_id is None
+    assert result.recommendation.reason is None
