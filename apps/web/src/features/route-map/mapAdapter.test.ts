@@ -366,3 +366,92 @@ describe('RouteMapAdapter layers', () => {
     }
   });
 });
+
+describe('RouteMapAdapter segment risk', () => {
+  async function readyAdapter(): Promise<{
+    adapter: RouteMapAdapter;
+    map: InstanceType<typeof FakeMap>;
+  }> {
+    stubWebgl(true);
+    const pending = RouteMapAdapter.create(document.createElement('div'), 'style.json');
+    FakeMap.instances[0]?.emit('load');
+    const adapter = await pending;
+    const map = FakeMap.instances[0];
+    if (map === undefined) throw new Error('map was not constructed');
+    return { adapter, map };
+  }
+
+  const SEGMENTS = {
+    'route-1': [
+      {
+        startIndex: 0,
+        endIndex: 1,
+        risk: 'MODERATE' as const,
+        coordinates: [
+          [-87.63, 41.88],
+          [-87.0, 41.0],
+        ] as [number, number][],
+      },
+      {
+        startIndex: 1,
+        endIndex: 2,
+        risk: null,
+        coordinates: [
+          [-87.0, 41.0],
+          [-87.5, 41.5],
+        ] as [number, number][],
+      },
+    ],
+  };
+
+  it('writes one feature per segment with its risk level', async () => {
+    const { adapter, map } = await readyAdapter();
+    adapter.setRoutes(LINES, POINTS);
+    adapter.setRoutes(LINES, POINTS, SEGMENTS);
+
+    const updates = map.sourceUpdates['trucksafe-routes']!;
+    expect(updates).toHaveLength(1);
+    const features = (
+      updates[0] as { features: Array<{ properties: Record<string, unknown> }> }
+    ).features;
+    expect(features).toHaveLength(3);
+    expect(features[0]!.properties['riskLevel']).toBe('MODERATE');
+    expect(features[1]!.properties['riskLevel']).toBe('unavailable');
+    expect(features[1]!.properties['routeId']).toBe('route-1');
+    expect(features[2]!.properties['routeId']).toBe('route-2');
+    expect(features[2]!.properties['riskLevel']).toBe('unavailable');
+    adapter.destroy();
+  });
+
+  it('falls back to one feature per route without segments', async () => {
+    const { adapter, map } = await readyAdapter();
+    adapter.setRoutes(LINES, POINTS);
+    adapter.setRoutes(LINES, POINTS);
+
+    const updates = map.sourceUpdates['trucksafe-routes']!;
+    expect(updates).toHaveLength(1);
+    const features = (
+      updates[0] as { features: Array<{ properties: Record<string, unknown> }> }
+    ).features;
+    expect(features).toHaveLength(2);
+    expect(features[0]!.properties['state']).toBe('recommended');
+    expect(features[0]!.properties['riskLevel']).toBeUndefined();
+    adapter.destroy();
+  });
+
+  it('updates segment features on later responses', async () => {
+    const { adapter, map } = await readyAdapter();
+    adapter.setRoutes(LINES, POINTS);
+    adapter.setRoutes(LINES, POINTS, SEGMENTS);
+    adapter.setRoutes(LINES, POINTS, SEGMENTS);
+
+    const updates = map.sourceUpdates['trucksafe-routes']!;
+    expect(updates).toHaveLength(2);
+    const features = (
+      updates[1] as { features: Array<{ properties: Record<string, unknown> }> }
+    ).features;
+    expect(features).toHaveLength(3);
+    expect(features[0]!.properties['riskLevel']).toBe('MODERATE');
+    adapter.destroy();
+  });
+});

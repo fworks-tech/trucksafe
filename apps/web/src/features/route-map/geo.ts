@@ -13,6 +13,7 @@ import { worstRiskLevel } from '../route-planning/risk';
 import type {
   CheckpointPayload,
   RiskLevel,
+  RiskSegmentPayload,
   RoutePayload,
   RoutePlanResponse,
 } from '../route-planning/types';
@@ -148,6 +149,13 @@ export interface MappableCheckpoint {
   role: CheckpointRole;
 }
 
+export interface MappableRouteSegment {
+  startIndex: number;
+  endIndex: number;
+  risk: RiskLevel | null;
+  coordinates: LngLat[];
+}
+
 export interface NormalizedPlanMap {
   lines: MappableRouteLine[];
   checkpoints: MappableCheckpoint[];
@@ -157,6 +165,8 @@ export interface NormalizedPlanMap {
   origin: LngLat | null;
   destination: LngLat | null;
   recommendedMidpoint: LngLat | null;
+  /** Per-route risk segments keyed by route ID; absent when unavailable. */
+  segments: Record<string, MappableRouteSegment[]>;
 }
 
 function checkpointRole(index: number, total: number): CheckpointRole {
@@ -176,6 +186,7 @@ export function normalizePlanMap(
   const lines: MappableRouteLine[] = [];
   const checkpoints: MappableCheckpoint[] = [];
   const states: Record<string, RouteVisualState> = {};
+  const segments: Record<string, MappableRouteSegment[]> = {};
   const geometries = new Map<string, ValidRouteGeometry>();
 
   for (const route of response.routes) {
@@ -186,6 +197,13 @@ export function normalizePlanMap(
     if (geometry !== null && state !== 'no-geometry') {
       geometries.set(route.id, geometry);
       lines.push({ routeId: route.id, state, coordinates: geometry.coordinates });
+      const routeSegments = extractRiskSegments(
+        route.risk_segments,
+        geometry.coordinates,
+      );
+      if (routeSegments !== null) {
+        segments[route.id] = routeSegments;
+      }
     }
     route.checkpoints.forEach((checkpoint, index) => {
       const point = normalizeCheckpointPoint(checkpoint);
@@ -253,7 +271,46 @@ export function normalizePlanMap(
     origin: firstPoint,
     destination: lastPoint,
     recommendedMidpoint,
+    segments,
   };
+}
+
+function extractRiskSegments(
+  rawSegments: RiskSegmentPayload[] | undefined,
+  geometryCoordinates: LngLat[],
+): MappableRouteSegment[] | null {
+  if (rawSegments === undefined || rawSegments.length === 0) return null;
+
+  const result: MappableRouteSegment[] = [];
+  let prevEnd = 0;
+
+  for (const seg of rawSegments) {
+    const startIndex = seg.start_index;
+    const endIndex = seg.end_index;
+    if (
+      !Number.isInteger(startIndex) ||
+      !Number.isInteger(endIndex) ||
+      startIndex < 0 ||
+      endIndex >= geometryCoordinates.length ||
+      endIndex < startIndex ||
+      startIndex !== prevEnd
+    ) {
+      return null;
+    }
+    prevEnd = endIndex;
+    if (startIndex === endIndex) continue;
+    result.push({
+      startIndex,
+      endIndex,
+      risk: seg.risk_level,
+      coordinates: geometryCoordinates.slice(startIndex, endIndex + 1),
+    });
+  }
+
+  if (result.length === 0) return null;
+  if (result[result.length - 1]!.endIndex !== geometryCoordinates.length - 1) return null;
+
+  return result;
 }
 
 /** Map display state for one route. The backend stays authoritative:

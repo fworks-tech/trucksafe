@@ -101,7 +101,7 @@ export function RouteMapSection({
         }
         adapter = created;
         adapterRef.current = created;
-        created.setRoutes(model.lines, model.checkpoints);
+        created.setRoutes(model.lines, model.checkpoints, model.segments);
         if (model.origin !== null && model.destination !== null) {
           created.setMarkers({
             origin: model.origin,

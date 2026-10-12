@@ -7,7 +7,12 @@
 
 import { delay, http, HttpResponse, type HttpHandler } from 'msw';
 
-import { makeAllIneligiblePlan, makeMinimalPlan, makeRoutePlan } from '../fixtures';
+import {
+  makeAllIneligiblePlan,
+  makeMinimalPlan,
+  makeRoute,
+  makeRoutePlan,
+} from '../fixtures';
 
 export type Scenario =
   | 'success'
@@ -19,7 +24,9 @@ export type Scenario =
   | 'unavailable'
   | 'malformed'
   | 'networkError'
-  | 'empty';
+  | 'empty'
+  | 'badSegments'
+  | 'noSegments';
 
 export interface CapturedRequest {
   headers: Record<string, string>;
@@ -92,6 +99,42 @@ export function routePlansHandler(
       case 'malformed':
         return HttpResponse.json(
           { routes: 'not-an-array' },
+          { status: 201, headers: { 'X-Request-ID': incomingId } },
+        );
+      case 'badSegments':
+        return HttpResponse.json(
+          makeRoutePlan({
+            routes: [
+              {
+                ...makeRoute('route-1', { recommended: true }),
+                risk_segments: [
+                  {
+                    start_index: 0,
+                    end_index: 99,
+                    risk_level: 'LOW',
+                    risk_score: 99,
+                    risk_reasons: [],
+                  },
+                ],
+              },
+              makeRoute('route-2'),
+              makeRoute('route-3'),
+            ],
+          }),
+          { status: 201, headers: { 'X-Request-ID': incomingId } },
+        );
+      case 'noSegments':
+        return HttpResponse.json(
+          makeRoutePlan({
+            routes: [
+              {
+                ...makeRoute('route-1', { recommended: true }),
+                risk_segments: undefined,
+              },
+              { ...makeRoute('route-2'), risk_segments: undefined },
+              { ...makeRoute('route-3'), risk_segments: undefined },
+            ],
+          }),
           { status: 201, headers: { 'X-Request-ID': incomingId } },
         );
       case 'empty':

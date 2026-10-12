@@ -9,6 +9,7 @@ import type {
   CheckpointPayload,
   RecommendationReasonPayload,
   RiskLevel,
+  RiskSegmentPayload,
   RoutePayload,
   RoutePlanResponse,
 } from './types';
@@ -62,6 +63,27 @@ export interface RouteOverrides {
   averageRiskScore?: number;
   checkpoints?: CheckpointPayload[];
   geometryNull?: boolean;
+  riskSegments?: RiskSegmentPayload[];
+}
+
+/** Segments matching the default three-checkpoint, two-point geometry. */
+export function makeRiskSegments(): RiskSegmentPayload[] {
+  return [
+    {
+      start_index: 0,
+      end_index: 1,
+      risk_level: 'MODERATE',
+      risk_score: 2,
+      risk_reasons: [],
+    },
+    {
+      start_index: 1,
+      end_index: 2,
+      risk_level: 'LOW',
+      risk_score: 1,
+      risk_reasons: [],
+    },
+  ];
 }
 
 export function makeRoute(id: string, overrides: RouteOverrides = {}): RoutePayload {
@@ -74,6 +96,7 @@ export function makeRoute(id: string, overrides: RouteOverrides = {}): RoutePayl
     noTravelMiles = 0,
     averageRiskScore = 1,
     geometryNull = false,
+    riskSegments,
   } = overrides;
   const checkpoints = overrides.checkpoints ?? [
     makeCheckpoint({ distanceMiles: 0 }),
@@ -97,10 +120,12 @@ export function makeRoute(id: string, overrides: RouteOverrides = {}): RoutePayl
           type: 'LineString',
           coordinates: [
             [-87.63, 41.88],
+            [-87.3, 41.4],
             [-87.0, 41.0],
           ],
         },
     checkpoints,
+    risk_segments: riskSegments ?? (geometryNull ? undefined : makeRiskSegments()),
   };
 }
 
