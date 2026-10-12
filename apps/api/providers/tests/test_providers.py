@@ -288,3 +288,41 @@ def test_mock_weather_rejects_non_finite_coordinates() -> None:
     """Non-finite coordinates are caller errors, not provider failures."""
     with pytest.raises(ValueError, match="finite"):
         MockWeatherProvider().get_weather(float("nan"), -87.0, valid_time=make_time())
+
+
+# --- mock geocoding ---
+
+
+def test_mock_geocode_resolves_known_addresses() -> None:
+    """Tabled addresses resolve to fixed coordinates, case-insensitively."""
+    assert MockRoutingProvider().geocode("Denver, CO") == Coordinate(
+        latitude=39.7392, longitude=-104.9903
+    )
+    assert MockRoutingProvider().geocode("denver, co") == MockRoutingProvider().geocode(
+        "  DENVER, CO  "
+    )
+
+
+def test_mock_geocode_derives_stable_fallback_coordinates() -> None:
+    """Unknown addresses derive deterministic in-bounds coordinates."""
+    first = MockRoutingProvider().geocode("Springfield, ZZ")
+    second = MockRoutingProvider().geocode("Springfield, ZZ")
+    assert first == second
+    assert 25.0 <= first.latitude <= 48.0
+    assert -125.0 <= first.longitude <= -67.0
+
+
+def test_mock_geocode_rejects_blank_address() -> None:
+    """Blank addresses are permanent failures, never retried."""
+    with pytest.raises(ProviderPermanentError):
+        MockRoutingProvider().geocode("   ")
+
+
+def test_mock_geocode_transient_failures_then_succeeds() -> None:
+    """Leading transient failures let retry logic reach success."""
+    provider = MockRoutingProvider(transient_failures=1)
+    with pytest.raises(ProviderTransientError):
+        provider.geocode("Denver, CO")
+    assert provider.geocode("Denver, CO") == Coordinate(
+        latitude=39.7392, longitude=-104.9903
+    )
