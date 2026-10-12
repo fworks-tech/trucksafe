@@ -43,13 +43,13 @@ UTC. `checkpoint_interval_miles` is optional and defaults to `25`.
 
 ## Acceptance Criteria
 
-- [ ] Origin is required and cannot be blank.
-- [ ] Destination is required and cannot be blank.
-- [ ] Departure date/time must be a valid ISO 8601 timestamp.
-- [ ] Load weight must be finite and greater than or equal to zero.
-- [ ] Checkpoint interval must be `10`, `25`, or `50`.
-- [ ] The backend requests three route alternatives.
-- [ ] Invalid requests return a consistent `400` response.
-- [ ] Provider failures return a safe and documented error response.
-- [ ] Route responses are validated before being processed.
-- [ ] The feature is covered by unit and integration tests.
+- [x] Origin is required and cannot be blank.
+- [x] Destination is required and cannot be blank.
+- [x] Departure date/time must be a valid ISO 8601 timestamp.
+- [x] Load weight must be finite and greater than or equal to zero.
+- [x] Checkpoint interval must be `10`, `25`, or `50`.
+- [x] The backend requests three route alternatives.
+- [x] Invalid requests return a consistent `400` response.
+- [x] Provider failures return a safe and documented error response.
+- [x] Route responses are validated before being processed.
+- [x] The feature is covered by unit and integration tests.

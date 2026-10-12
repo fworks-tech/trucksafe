@@ -64,11 +64,11 @@ Each route must expose:
 
 ## Acceptance Criteria
 
-- [ ] All returned route alternatives are displayed.
-- [ ] Severe miles have priority over all other criteria.
-- [ ] High-risk miles are compared after severe miles.
-- [ ] Average risk is compared after severe and high-risk miles.
-- [ ] Travel time is used as the final tie-breaker.
-- [ ] Recommendation results are deterministic.
-- [ ] The recommended route includes an explanation.
-- [ ] Route ranking is covered by unit tests.
+- [x] All returned route alternatives are displayed.
+- [x] Severe miles have priority over all other criteria.
+- [x] High-risk miles are compared after severe miles.
+- [x] Average risk is compared after severe and high-risk miles.
+- [x] Travel time is used as the final tie-breaker.
+- [x] Recommendation results are deterministic.
+- [x] The recommended route includes an explanation.
+- [x] Route ranking is covered by unit tests.
