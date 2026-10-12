@@ -22,9 +22,10 @@ export function RoutePlanPage(): React.JSX.Element {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    const current = abortRef.current;
     return (): void => {
-      current?.abort();
+      // Read the ref inside the cleanup so unmount aborts whichever
+      // request is in flight, not the (empty) value at mount time.
+      abortRef.current?.abort();
     };
   }, []);
 
