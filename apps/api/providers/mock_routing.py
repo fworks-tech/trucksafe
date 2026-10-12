@@ -80,6 +80,11 @@ class MockRoutingProvider:
         Known addresses resolve to fixed coordinates. Any other non-blank
         address derives stable coordinates from its SHA-256 digest, so
         repeated lookups agree without network access.
+
+        The fallback does not validate that an address is real or
+        deliverable: gibberish resolves instead of failing. A real
+        geocoding adapter must reject unknown addresses; only the mock
+        is this permissive.
         """
         self.calls += 1
         if self._failure is not None:
