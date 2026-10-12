@@ -184,6 +184,9 @@ export function RouteMapSection({
             {mapStatus === 'loading' && (
               <Skeleton
                 variant="rectangular"
+                // An aria-label on a plain span is prohibited (WCAG 4.1.2);
+                // the progressbar role is what makes the announcement legal.
+                role="progressbar"
                 aria-label="Loading map"
                 sx={{
                   position: 'absolute',
