@@ -137,6 +137,72 @@ Response notes:
 - Routing, geocoding, and weather currently come from deterministic
   mock providers. Mock data must never be presented as live weather.
 
+## Health
+
+```http
+GET /health
+```
+
+Shallow liveness probe. Returns `200` with `{"status": "ok"}` when the
+application is running. It touches no database and no providers, and
+writes nothing. Every response still carries `X-Request-ID`.
+
+## Readiness
+
+```http
+GET /ready
+```
+
+Readiness for route-planning requests. Returns `200` when every
+required dependency is available:
+
+```json
+{
+  "status": "ready",
+  "checks": {
+    "database": "ok",
+    "routing_provider": "ok",
+    "weather_provider": "ok"
+  }
+}
+```
+
+Returns `503` with `"status": "not_ready"` and the failing check named
+`"unavailable"` when any required dependency is down. Example:
+
+```json
+{
+  "status": "not_ready",
+  "checks": {
+    "database": "ok",
+    "routing_provider": "unavailable",
+    "weather_provider": "ok"
+  }
+}
+```
+
+Checks performed:
+
+- `database`: the default database accepts a connection (read-only,
+  no writes).
+- `routing_provider` / `weather_provider`: the configured provider
+  factory resolves to an adapter implementing the provider protocol.
+
+Mock-phase limitation: the current providers are deterministic mocks
+with no network or credentials, so provider checks verify wiring and
+configuration — not external reachability. A dotted import path or
+callable in `settings.TRUCKSAFE_ROUTING_PROVIDER` /
+`TRUCKSAFE_WEATHER_PROVIDER` selects a real adapter later; an
+unresolvable value reports that provider `unavailable` instead of
+raising. Those settings are deployer-controlled server-side
+configuration: they are never read from request data, and module paths
+or exception details never appear in responses. Failure responses never include stack traces, credentials,
+provider payloads, or connection details.
+
+Health and readiness have different semantics and are not aliases:
+`/health` answers "is the process running", `/ready` answers "can it
+plan routes right now".
+
 ## Request IDs
 
 Every response carries an `X-Request-ID` header, and every error
@@ -181,8 +247,6 @@ available:
 ```text
 GET /route-plans/{route_plan_id}
 GET /route-plans/{route_plan_id}/weather-grid?offset_hours={0..48}
-GET /health
-GET /ready
 ```
 
 Likewise deferred: real provider adapters (with timeouts, backoff, and

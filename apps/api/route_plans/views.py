@@ -8,6 +8,7 @@ unexpected exceptions propagate to Django's 500 handling.
 
 import uuid
 
+from django.db import transaction
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.status import (
@@ -20,8 +21,7 @@ from rest_framework.status import (
 from rest_framework.views import APIView
 
 from providers.errors import ProviderPermanentError, ProviderTransientError
-from providers.mock_routing import MockRoutingProvider
-from providers.mock_weather import MockWeatherProvider
+from providers.factory import get_routing_provider, get_weather_provider
 
 from .models import RoutePlan
 from .serializers import RoutePlanRequestSerializer, build_response
@@ -65,8 +65,8 @@ class RoutePlanCreateView(APIView):
                 departure_at=validated["departure_at"],
                 load_weight_lb=validated["load_weight_lb"],
                 checkpoint_interval_miles=float(validated["checkpoint_interval_miles"]),
-                routing_provider=MockRoutingProvider(),
-                weather_provider=MockWeatherProvider(),
+                routing_provider=get_routing_provider(),
+                weather_provider=get_weather_provider(),
             )
         except ProviderPermanentError as exc:
             return error_response(
@@ -90,20 +90,21 @@ class RoutePlanCreateView(APIView):
                 request_id,
             )
         payload = build_response(result)
-        plan, created = RoutePlan.objects.get_or_create(
-            plan_id=result.plan_id,
-            defaults={
-                "origin": request.data.get("origin"),
-                "destination": request.data.get("destination"),
-                "departure_at": validated["departure_at"],
-                "load_weight_lb": validated["load_weight_lb"],
-                "checkpoint_interval_miles": float(
-                    validated["checkpoint_interval_miles"]
-                ),
-                "recommended_route_id": result.recommendation.recommended_route_id,
-                "response": payload,
-            },
-        )
+        with transaction.atomic():
+            plan, created = RoutePlan.objects.get_or_create(
+                plan_id=result.plan_id,
+                defaults={
+                    "origin": request.data.get("origin"),
+                    "destination": request.data.get("destination"),
+                    "departure_at": validated["departure_at"],
+                    "load_weight_lb": validated["load_weight_lb"],
+                    "checkpoint_interval_miles": float(
+                        validated["checkpoint_interval_miles"]
+                    ),
+                    "recommended_route_id": result.recommendation.recommended_route_id,
+                    "response": payload,
+                },
+            )
         return Response(
             plan.response if not created else payload,
             status=HTTP_201_CREATED if created else HTTP_200_OK,

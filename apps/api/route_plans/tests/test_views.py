@@ -174,12 +174,36 @@ def test_invalid_payloads_return_400(
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    "origin",
+    [
+        {"address": "Denver, CO", "latitude": 41.0, "longitude": -87.0},
+        {"address": "x" * 201},
+        {},
+        "Denver, CO",
+    ],
+    ids=["both-forms", "address-too-long", "no-form", "not-a-dict"],
+)
+def test_rejected_endpoint_forms_return_400(
+    client: APIClient, payload: dict, origin: object
+) -> None:
+    """Endpoints in no accepted form map to a 400 envelope."""
+    payload["origin"] = origin
+    response = client.post(URL, payload, format="json")
+    assert response.status_code == 400
+    error = response.json()["error"]
+    assert error["code"] == "INVALID_REQUEST"
+    assert error["request_id"]
+    assert response["X-Request-ID"] == error["request_id"]
+
+
+@pytest.mark.django_db
 def test_permanent_provider_failure_returns_422(
     client: APIClient, payload: dict, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Unroutable requests map permanent errors to 422."""
     monkeypatch.setattr(
-        "route_plans.views.MockRoutingProvider",
+        "route_plans.views.get_routing_provider",
         lambda: MockRoutingProvider(failure=ProviderPermanentError("no route")),
     )
     response = client.post(URL, payload, format="json")
@@ -195,7 +219,7 @@ def test_transient_outage_returns_503(
 ) -> None:
     """Exhausted transient failures map to a safe 503 envelope."""
     monkeypatch.setattr(
-        "route_plans.views.MockWeatherProvider",
+        "route_plans.views.get_weather_provider",
         lambda: MockWeatherProvider(transient_failures=99),
     )
     response = client.post(URL, payload, format="json")
@@ -248,7 +272,7 @@ def test_malformed_provider_response_returns_400(
         raise ValueError("route geometry needs at least origin and destination")
 
     monkeypatch.setattr(
-        "route_plans.views.MockRoutingProvider",
+        "route_plans.views.get_routing_provider",
         lambda: _StubRoutingProvider(broken_plan_routes),
     )
     response = client.post(URL, payload, format="json")
@@ -266,7 +290,7 @@ def test_all_ineligible_plan_has_null_recommendation(
 ) -> None:
     """Total weather outage selects nothing and explains nothing."""
     monkeypatch.setattr(
-        "route_plans.views.MockWeatherProvider",
+        "route_plans.views.get_weather_provider",
         lambda: MockWeatherProvider(always_unavailable=True),
     )
     response = client.post(URL, payload, format="json")

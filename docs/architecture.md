@@ -111,7 +111,12 @@ class WeatherProvider:
         ...
 ```
 
-Provider adapters are responsible for:
+Provider adapters are resolved through small factories
+(`providers/factory.py`): the deterministic mocks by default, or a
+dotted import path / callable from `settings.TRUCKSAFE_ROUTING_PROVIDER`
+and `settings.TRUCKSAFE_WEATHER_PROVIDER` for real adapters later.
+Views and readiness checks share this seam, so there is exactly one
+wiring path. Adapters are responsible for:
 
 - Authentication (real adapters; mocks use none).
 - HTTP requests (real adapters; mocks perform no I/O).
@@ -161,13 +166,17 @@ The application implements:
 - Response schema validation.
 - Structured error responses.
 - Request correlation IDs (valid client ids propagated, else generated).
+- Health (`GET /api/v1/health`, shallow liveness) and readiness
+  (`GET /api/v1/ready`, per-dependency `200`/`503`) probes in the
+  `health/` app, which holds no route-planning logic. Provider checks
+  verify factory wiring, not external reachability, while mocks are in
+  use.
 
 Still planned:
 
 - Provider timeouts.
 - Exponential backoff.
 - Cache expiration.
-- Health and readiness endpoints.
 
 ## Performance Considerations
 

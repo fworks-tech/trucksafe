@@ -92,6 +92,7 @@ INSTALLED_APPS = [
     # Third-party applications
     "rest_framework",
     # Local applications
+    "health.apps.HealthConfig",
     "risk.apps.RiskConfig",
     "route_plans.apps.RoutePlansConfig",
 ]

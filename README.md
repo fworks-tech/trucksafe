@@ -58,6 +58,9 @@ The project is being implemented incrementally using vertical slices.
 - Framework-independent route aggregation and deterministic route recommendation in `routing/`
 - Deterministic mocked routing, geocoding, and weather providers behind protocols in `providers/`
 - Route-planning API slice in `route_plans/`: `POST /api/v1/route-plans` with validation, orchestration, deterministic persistence, and safe error envelopes
+- Operational probes in `health/`: `GET /api/v1/health` (shallow liveness) and `GET /api/v1/ready` (per-dependency `200`/`503` readiness)
+- Provider factories in `providers/factory.py` resolving the configured adapters (mocks by default)
+- HTTP integration tests for degraded states: partial/all weather loss, severe-weather ineligibility, retry call counts, UTC-equivalent idempotency, and failure hygiene
 - Settings parsing tests for debug flags, allowed hosts, and the secret-key guard
 
 Run the backend suite with `python -m pytest` from `apps/api` (see Testing Strategy).
@@ -70,7 +73,6 @@ Run the backend suite with `python -m pytest` from `apps/api` (see Testing Strat
 - `GET` route-plan retrieval and weather-grid endpoints
 - PostgreSQL/PostGIS persistence, Redis caching, Celery tasks
 - Docker, Docker Compose, CI/CD workflows
-- Health and readiness endpoints
 - API contract tests and Playwright end-to-end tests
 
 **No external routing or weather provider is connected yet.** The backend currently runs on Django defaults with SQLite and needs no external services or credentials.
@@ -150,8 +152,13 @@ Run the backend suite with `python -m pytest` from `apps/api` (see Testing Strat
   │   ├── providers/              # Provider protocols and deterministic mocks
   │   │   ├── protocols.py
   │   │   ├── errors.py
+  │   │   ├── factory.py            # Configured provider resolution
   │   │   ├── mock_routing.py
   │   │   ├── mock_weather.py
+  │   │   └── tests/
+  │   ├── health/                   # GET /api/v1/health and /api/v1/ready
+  │   │   ├── checks.py             # Readiness probes (no network calls)
+  │   │   ├── views.py
   │   │   └── tests/
   │   ├── route_plans/            # POST /api/v1/route-plans slice
   │   │   ├── services.py         # Django-free orchestration
@@ -175,6 +182,7 @@ The backend intentionally uses flat packages:
 
 ```text
 apps/api/config
+apps/api/health
 apps/api/risk
 apps/api/routing
 apps/api/providers
@@ -503,7 +511,7 @@ The API will use versioned endpoints under:
 /api/v1
 ```
 
-> `POST /api/v1/route-plans` is implemented. The contract below is defined in [docs/api.md](docs/api.md); the OpenAPI document in `packages/contracts/openapi.yaml` is still planned.
+> `POST /api/v1/route-plans`, `GET /api/v1/health`, and `GET /api/v1/ready` are implemented. The contract is defined in [docs/api.md](docs/api.md); the OpenAPI document in `packages/contracts/openapi.yaml` is still planned.
 
 ### Create a Route Plan
 
@@ -545,16 +553,29 @@ Every response carries an `X-Request-ID` header (a valid client-provided
 id is propagated, otherwise a server id is generated); error envelopes
 carry the same id.
 
+### Health and Readiness
+
+```http
+GET /api/v1/health
+GET /api/v1/ready
+```
+
+`/health` is a shallow liveness probe returning `{"status": "ok"}`; it
+touches no database and no providers. `/ready` reports per-dependency
+state (`database`, `routing_provider`, `weather_provider`): `200`
+`{"status": "ready", ...}` when all checks pass, `503`
+`{"status": "not_ready", ...}` naming the unavailable checks. Provider
+checks verify the configured adapter wiring; the deterministic mocks
+perform no network calls.
+
 ### Planned Endpoints
 
-`GET` route-plan retrieval, weather-grid, health, and readiness endpoints
-are not implemented yet:
+`GET` route-plan retrieval and weather-grid endpoints are not
+implemented yet:
 
 ```http
 GET /api/v1/route-plans/{route_plan_id}
 GET /api/v1/route-plans/{route_plan_id}/weather-grid?offset_hours=12
-GET /api/v1/health
-GET /api/v1/ready
 ```
 
 ### Error Format
@@ -581,9 +602,9 @@ Errors use a consistent envelope:
 | `422` | Valid request format but unroutable (`UNROUTABLE`) |
 | `503` | Transient provider failures exhausted (`PROVIDER_UNAVAILABLE`) |
 
-Unexpected errors use Django's default `500` handling. `GET` retrieval,
-weather-grid, health, and readiness endpoints are planned; no `404` or
-`502` mappings exist yet.
+Unexpected errors use Django's default `500` handling. `GET` retrieval
+and weather-grid endpoints are planned; no `404` or `502` mappings
+exist yet.
 
 ---
 
