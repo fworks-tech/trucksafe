@@ -15,6 +15,16 @@ def client() -> APIClient:
 
 
 @pytest.mark.django_db
+def test_health_generates_id_when_header_absent(client: APIClient) -> None:
+    """A missing request id yields a generated 32-hex response header."""
+    response = client.get("/api/v1/health")
+    assert response.status_code == 200
+    header = response["X-Request-ID"]
+    assert len(header) == 32
+    int(header, 16)
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize("url", ["/api/v1/health", "/api/v1/health/"])
 def test_health_returns_ok_without_side_effects(
     client: APIClient, url: str, monkeypatch: pytest.MonkeyPatch

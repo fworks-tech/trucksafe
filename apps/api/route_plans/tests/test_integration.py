@@ -100,6 +100,9 @@ def test_success_payload_satisfies_end_to_end_invariants(
         checkpoints = route["checkpoints"]
         assert len(checkpoints) >= 2
         assert checkpoints[0]["distance_miles"] == 0
+        last = checkpoints[-1]
+        assert last["latitude"] == pytest.approx(payload["destination"]["latitude"])
+        assert last["longitude"] == pytest.approx(payload["destination"]["longitude"])
         assert [cp["checkpoint_id"] for cp in checkpoints] == [
             cp["checkpoint_id"]
             for cp in sorted(checkpoints, key=lambda c: c["sequence"])

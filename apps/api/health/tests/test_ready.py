@@ -93,15 +93,25 @@ class _FailingConnection:
 
 
 @pytest.mark.django_db
-def test_ready_reports_unresolvable_provider(client: APIClient) -> None:
-    """A bad provider setting maps to 503, never a 500 or a leak."""
-    with override_settings(TRUCKSAFE_ROUTING_PROVIDER="missing.module.Provider"):
+@pytest.mark.parametrize(
+    "setting",
+    [
+        {"TRUCKSAFE_ROUTING_PROVIDER": "missing.module.Provider"},
+        {"TRUCKSAFE_ROUTING_PROVIDER": 42},
+        {"TRUCKSAFE_WEATHER_PROVIDER": lambda: 1 / 0},
+    ],
+    ids=["bad-path", "non-callable", "raising-constructor"],
+)
+def test_ready_reports_invalid_provider_configuration(
+    client: APIClient, setting: dict[str, object]
+) -> None:
+    """Unresolvable factories map to 503, never a 500 or a leak."""
+    with override_settings(**setting):
         response = client.get("/api/v1/ready")
     assert response.status_code == 503
-    body = response.json()
-    assert body["status"] == "not_ready"
-    assert body["checks"]["routing_provider"] == "unavailable"
+    assert response.json()["status"] == "not_ready"
     assert "Traceback" not in response.content.decode()
+    assert response["X-Request-ID"]
 
 
 @pytest.mark.django_db
