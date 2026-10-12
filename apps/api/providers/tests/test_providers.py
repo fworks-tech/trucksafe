@@ -264,6 +264,18 @@ def test_mock_weather_transient_failures_then_succeeds() -> None:
     assert provider.get_weather(41.0, -87.0, valid_time=make_time()) is not None
 
 
+def test_mock_weather_rejects_negative_transient_failures() -> None:
+    """Failure counters cannot be negative on the weather side either."""
+    with pytest.raises(ValueError, match="transient_failures"):
+        MockWeatherProvider(transient_failures=-1)
+
+
+def test_mock_weather_rejects_non_datetime_time() -> None:
+    """A non-datetime valid_time is a caller error, not a lookup."""
+    with pytest.raises(ValueError, match="valid_time must be a datetime"):
+        MockWeatherProvider().get_weather(41.0, -87.0, valid_time="noon")  # type: ignore[arg-type]
+
+
 def test_mock_weather_rejects_naive_time() -> None:
     """Lookups require timezone-aware timestamps like the rest of the domain."""
     with pytest.raises(ValueError, match="timezone-aware"):
