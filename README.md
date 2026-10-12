@@ -277,11 +277,17 @@ The API will be available at:
 http://localhost:8000
 ```
 
-No route-planning endpoints are exposed yet; only the Django admin path is registered.
+The API exposes `POST /api/v1/route-plans` for route planning plus
+operational probes `GET /api/v1/health` (liveness) and
+`GET /api/v1/ready` (per-dependency readiness) alongside the Django
+admin path. The full contract is documented in [docs/api.md](docs/api.md).
 
 ### Environment Variables
 
-`.env.example` documents planned configuration (database, Redis, provider credentials, frontend tokens). Settings now read `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, and `ALLOWED_HOSTS` from the environment with development-only fallbacks: an unrecognized debug value is rejected, and a production-like run with debug off and no secret key fails fast instead of booting with a known key. The database uses SQLite defaults and no provider integrations exist, so no `.env` file is required to run the backend locally.
+`.env.example` documents planned configuration (database, Redis, provider credentials, frontend tokens). Settings now read `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, and `ALLOWED_HOSTS` from the environment with development-only fallbacks: an unrecognized debug value is rejected, and a production-like run with debug off and no secret key fails fast instead of booting with a known key. The database uses SQLite defaults and no real external provider
+integrations exist yet — routing, geocoding, and weather go through
+deterministic mock adapters resolved by the provider factory — so no
+`.env` file is required to run the backend locally.
 
 Never commit `.env` files or private credentials.
 
@@ -417,7 +423,7 @@ Risk scores:
 | Severe | 4 |
 | No Travel | 5 |
 
-> The ranking engine is planned. The priority order above is normative and must be implemented exactly as written.
+> The ranking engine is implemented in `routing/recommendation.py`. The priority order above is normative and is enforced exactly as written.
 
 ---
 

@@ -41,8 +41,8 @@ departure_time +
 - [x] Checkpoint distances are non-negative.
 - [x] Checkpoint ETAs are non-decreasing.
 - [x] The final route destination is included.
-- [ ] Weather requests use the checkpoint ETA.
-- [ ] Weather values are normalized to the application's internal units.
-- [ ] Malformed weather responses are rejected safely.
+- [x] Weather requests use the checkpoint ETA.
+- [x] Weather values are normalized to the application's internal units.
+- [x] Malformed weather responses are rejected safely.
 - [ ] Weather provider timeouts are handled without exposing internal errors.
 - [x] Checkpoint and ETA calculations have unit test coverage.
