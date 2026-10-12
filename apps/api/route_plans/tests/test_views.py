@@ -174,6 +174,30 @@ def test_invalid_payloads_return_400(
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    "origin",
+    [
+        {"address": "Denver, CO", "latitude": 41.0, "longitude": -87.0},
+        {"address": "x" * 201},
+        {},
+        "Denver, CO",
+    ],
+    ids=["both-forms", "address-too-long", "no-form", "not-a-dict"],
+)
+def test_rejected_endpoint_forms_return_400(
+    client: APIClient, payload: dict, origin: object
+) -> None:
+    """Endpoints in no accepted form map to a 400 envelope."""
+    payload["origin"] = origin
+    response = client.post(URL, payload, format="json")
+    assert response.status_code == 400
+    error = response.json()["error"]
+    assert error["code"] == "INVALID_REQUEST"
+    assert error["request_id"]
+    assert response["X-Request-ID"] == error["request_id"]
+
+
+@pytest.mark.django_db
 def test_permanent_provider_failure_returns_422(
     client: APIClient, payload: dict, monkeypatch: pytest.MonkeyPatch
 ) -> None:

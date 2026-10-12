@@ -46,7 +46,7 @@ class EndpointField(serializers.DictField):
         """Validate one endpoint form and build the domain Endpoint."""
         if isinstance(data, dict):
             return self._parse_dict(data)
-        self.fail("not_a_dict")
+        self.fail("not_a_dict", input_type=type(data).__name__)
         raise AssertionError("unreachable: fail() always raises")
 
     def _parse_dict(self, data: dict) -> Endpoint:
