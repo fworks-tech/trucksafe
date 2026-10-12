@@ -69,7 +69,8 @@ Test scenarios include:
 - Fewer than three route alternatives (deferred: the protocol requires exactly three).
 - Cache hit (deferred: no cache yet).
 - Cache miss (deferred: no cache yet).
-- Database failure (deferred).
+- Database failure (covered: readiness reports `503` with `database`
+  `unavailable` when the connection check fails; no Redis exists yet).
 - Redis failure (deferred: no Redis yet).
 
 ## API Tests
@@ -84,8 +85,17 @@ API tests should cover:
 - Unsupported checkpoint intervals.
 - Invalid provider payloads.
 - Consistent error responses.
-- Health endpoint (deferred: not implemented).
-- Readiness endpoint (deferred: not implemented).
+- Health endpoint (implemented: exact `{"status": "ok"}` shape, no DB
+  writes, no provider use, request-ID propagation; `/health` and
+  `/health/`).
+- Readiness endpoint (implemented: `200` all-ok, `503` per-check
+  `unavailable` for database/routing/weather failures, safe payloads;
+  `/ready` and `/ready/`).
+- End-to-end route-plan invariants through HTTP: ordered checkpoints,
+  non-decreasing UTC ETAs, explicit unavailable weather (never Low),
+  deterministic warnings, UTC-equivalent idempotency, exact retry call
+  counts, and no partial persistence after failures
+  (`route_plans/tests/test_integration.py`).
 - Rate limiting (deferred: not implemented).
 - CORS behavior (deferred: not implemented).
 

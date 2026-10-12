@@ -48,6 +48,16 @@ Every request includes:
 - Error code when applicable (implemented in error envelopes).
 - Provider name, request duration, result status (deferred: no structured logging yet).
 
+## Operational Probes
+
+- `GET /api/v1/health` (implemented): shallow liveness, no database or
+  provider contact, exact `{"status": "ok"}` shape.
+- `GET /api/v1/ready` (implemented): `200` when the database and the
+  configured routing/weather providers resolve, `503` naming the
+  unavailable checks otherwise. Provider checks verify factory wiring;
+  mocks perform no network calls, so external reachability is not
+  probed in this phase.
+
 ## Acceptance Criteria
 
 - [ ] Invalid input returns a structured client error.
@@ -55,6 +65,6 @@ Every request includes:
 - [ ] Malformed provider responses are rejected.
 - [ ] Rate limiting is enabled for route planning requests.
 - [ ] Secrets are not exposed in frontend bundles or logs.
-- [ ] Health and readiness endpoints are available.
+- [x] Health and readiness endpoints are available.
 - [ ] Critical failures are logged with a request ID.
 - [ ] Security and reliability behavior is covered by integration tests.
