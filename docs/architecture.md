@@ -87,6 +87,17 @@ Risk classification and route recommendation should remain independent of Django
 
 This makes the most important business rules easy to test and reuse.
 
+The framework-independent routing package owns:
+
+- Checkpoint sampling and ETA interpolation (`routing/checkpoints.py`).
+- Route, checkpoint, and summary entities plus deterministic ranking
+  (`routing/domain.py`, `routing/aggregation.py`, `routing/recommendation.py`).
+- Segment risk geometry enrichment (`routing/segments.py`): a pure
+  function that inserts vertices at checkpoint positions and names the
+  interval each segment covers in the returned geometry. It imports no
+  Django, DRF, database, HTTP, or provider types, and reuses the same
+  haversine/interpolation helpers so there is one distance model.
+
 ## External Provider Adapters
 
 External integrations must be isolated behind provider interfaces.

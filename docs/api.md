@@ -95,8 +95,24 @@ request repeats (same deterministic plan id, stored payload returned).
       "average_risk_score": 1.42,
       "geometry": {
         "type": "LineString",
-        "coordinates": [[-104.9903, 39.7392]]
+        "coordinates": [[-104.9903, 39.7392], [-104.8, 39.6], [-104.5, 39.4]]
       },
+      "risk_segments": [
+        {
+          "start_index": 0,
+          "end_index": 1,
+          "risk_level": "LOW",
+          "risk_score": 1.0,
+          "risk_reasons": ["wind"]
+        },
+        {
+          "start_index": 1,
+          "end_index": 2,
+          "risk_level": "HIGH",
+          "risk_score": 3.0,
+          "risk_reasons": ["wind", "rain"]
+        }
+      ],
       "checkpoints": [
         {
           "sequence": 1,
@@ -120,6 +136,20 @@ Response notes:
 
 - Exactly three routes are always returned, in provider order, each with
   `recommendation_rank` over all routes.
+- `risk_segments` is optional and additive. When present it carries one
+  entry per route segment between consecutive checkpoints, in origin to
+  destination order, referencing `geometry.coordinates` by
+  `start_index`/`end_index` (inclusive). The geometry returned alongside
+  it is enriched so every checkpoint sits on a vertex; the frontend
+  slices `coordinates` between those indices to color the segment.
+  Omit `risk_segments` (or return `[]`) and clients fall back to
+  route-level coloring, so older and newer responses both stay valid.
+- A segment inherits the risk of the checkpoint at its end, matching how
+  `severe_miles`/`high_miles` are attributed. When weather is
+  unavailable for that checkpoint, `risk_level` is `null` and
+  `risk_score` is `null` — never a fabricated Low. Segments are
+  all-or-nothing per route: any index mismatch omits the whole array for
+  that route rather than shipping partial risk.
 - Checkpoint ETAs are UTC ISO 8601 with a `Z` suffix.
 - `weather_available: false` means no observation existed for that
   checkpoint; `risk_level` is then `null` and the route is ineligible.

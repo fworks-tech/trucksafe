@@ -67,8 +67,9 @@ Run the backend suite with `python -m pytest` from `apps/api` (see Testing Strat
 
 ### Planned (Not Implemented Yet)
 
-- React frontend: weather heatmap, forecast slider, segment-level risk
-  visualization (form, route cards, and the base route map are implemented)
+- React frontend: weather heatmap and forecast slider visualization
+  (form, route cards, base route map, and segment-level risk coloring are
+  implemented)
 - OpenAPI contract in `packages/contracts/openapi.yaml`
 - Real routing and weather provider adapters (timeouts, backoff, unit conversion)
 - `GET` route-plan retrieval and weather-grid endpoints
@@ -102,9 +103,11 @@ Run the backend suite with `python -m pytest` from `apps/api` (see Testing Strat
 - Material UI (+ Emotion)
 - Vitest + React Testing Library + MSW, Playwright, axe-core
 
-Weather heatmap, forecast slider, and segment-level risk visualization
-remain planned. The base route map is implemented with MapLibre GL JS (no
-Mapbox token required). See `apps/web/README.md` for setup and scope.
+Weather heatmap and forecast slider visualization remain planned. The
+base route map and segment-level risk coloring are implemented with
+MapLibre GL JS (no Mapbox token required); segment risk is returned by
+the API as `risk_segments` and colored without recomputation on the
+client. See `apps/web/README.md` for setup and scope.
 
 ### Data and Infrastructure (Planned)
 

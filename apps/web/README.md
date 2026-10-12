@@ -27,9 +27,8 @@ Implemented:
   and Playwright end-to-end coverage of the critical flows.
 
 Deferred (not implemented): weather heatmap, forecast slider,
-segment-level risk visualization, real provider adapters,
-OpenAPI-generated client, Storybook, production deployment,
-authentication, observability, rate limiting.
+real provider adapters, OpenAPI-generated client, Storybook,
+production deployment, authentication, observability, rate limiting.
 
 Results use deterministic demonstration data from the backend mock
 providers. The UI never presents mock weather as live weather.
@@ -123,9 +122,13 @@ are public configuration and must never hold secrets or credentials.
     fields. Everything is re-validated in `geo.ts` (finite numbers, WGS84
     bounds, minimum two points) before reaching the map library. Invalid
     geometry is omitted and reported; route cards always remain.
-  - Route-level styling only (recommended / selected / eligible /
-    ineligible / No Travel via width, opacity, dash, and labels).
-    Segment-level risk coloring is deferred.
+  - Route-level styling (recommended / selected / eligible / ineligible /
+    No Travel via width, opacity, dash, and labels) plus segment-level
+    risk coloring: the backend returns `risk_segments` with
+    `start_index`/`end_index` into the returned `geometry`, and the map
+    slices that geometry into one colored feature per segment. Unavailable
+    segment risk stays gray, never Low, and mismatched intervals fall
+    back to route-level coloring for that route.
   - The map chunk (`maplibre-*`) is lazy-loaded with the result section:
     the initial form route ships without it (~24 kB app JS). The map
     vendor chunk is large (~1 MB raw, ~290 kB gzip); keep it lazy and
