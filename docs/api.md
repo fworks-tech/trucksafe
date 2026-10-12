@@ -194,7 +194,9 @@ configuration — not external reachability. A dotted import path or
 callable in `settings.TRUCKSAFE_ROUTING_PROVIDER` /
 `TRUCKSAFE_WEATHER_PROVIDER` selects a real adapter later; an
 unresolvable value reports that provider `unavailable` instead of
-raising. Failure responses never include stack traces, credentials,
+raising. Those settings are deployer-controlled server-side
+configuration: they are never read from request data, and module paths
+or exception details never appear in responses. Failure responses never include stack traces, credentials,
 provider payloads, or connection details.
 
 Health and readiness have different semantics and are not aliases:

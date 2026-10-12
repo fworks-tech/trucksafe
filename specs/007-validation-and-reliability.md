@@ -60,11 +60,11 @@ Every request includes:
 
 ## Acceptance Criteria
 
-- [ ] Invalid input returns a structured client error.
+- [x] Invalid input returns a structured client error.
 - [ ] Provider timeouts return a safe service error.
-- [ ] Malformed provider responses are rejected.
+- [x] Malformed provider responses are rejected.
 - [ ] Rate limiting is enabled for route planning requests.
-- [ ] Secrets are not exposed in frontend bundles or logs.
+- [x] Secrets are not exposed in frontend bundles or logs.
 - [x] Health and readiness endpoints are available.
 - [ ] Critical failures are logged with a request ID.
-- [ ] Security and reliability behavior is covered by integration tests.
+- [x] Security and reliability behavior is covered by integration tests.
