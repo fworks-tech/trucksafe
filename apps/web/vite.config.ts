@@ -15,6 +15,25 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Keep UI/query/form vendors out of the app chunk so vendor code
+        // caches across deploys. (React itself stays in the app chunk:
+        // splitting it out leaves an empty facade chunk.)
+        manualChunks: {
+          mui: [
+            '@mui/material',
+            '@mui/icons-material',
+            '@emotion/react',
+            '@emotion/styled',
+          ],
+          query: ['@tanstack/react-query'],
+          form: ['react-hook-form', '@hookform/resolvers', 'zod'],
+        },
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./test/setup.ts'],

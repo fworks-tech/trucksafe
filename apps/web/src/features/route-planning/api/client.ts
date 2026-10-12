@@ -3,10 +3,10 @@
  * - Sends JSON with `Content-Type: application/json`.
  * - Always sends a valid `X-Request-ID` (propagates a supplied one, else
  *   generates a fresh id per request).
- * - Validates successful payloads with Zod: the top-level structure is
- *   strict (malformed shape -> `malformed` error), while nested provider
- *   data degrades to safe fallbacks (missing weather -> unavailable,
- *   missing risk -> `null`, missing geometry -> `null`).
+ * - Validates successful payloads with Zod: unknown fields are stripped,
+ *   missing or mistyped required fields reject with a `malformed` error,
+ *   while nested provider data degrades to safe fallbacks (missing weather
+ *   -> unavailable, missing risk -> `null`, missing geometry -> `null`).
  * - Never retries; never logs payloads.
  */
 
