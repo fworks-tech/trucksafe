@@ -80,6 +80,24 @@ def test_geocode_empty_result_is_permanent() -> None:
         provider.geocode("Nowhere, ZZ")
 
 
+def test_geocode_rejects_half_missing_coordinates() -> None:
+    half = json.dumps(
+        {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {"countrycode": "US"},
+                    "geometry": {"type": "Point", "coordinates": [None, 29.7604]},
+                }
+            ],
+        }
+    ).encode()
+    provider = OsrmRoutingProvider(transport=transport_for({"/api/": half}))
+    with pytest.raises(ProviderPermanentError):
+        provider.geocode("Halfway, ZZ")
+
+
 def test_geocode_rejects_blank_address() -> None:
     provider = OsrmRoutingProvider(transport=transport_for({}))
     with pytest.raises(ProviderPermanentError):
@@ -142,3 +160,12 @@ def test_plan_routes_rejects_zero_distance() -> None:
     )
     with pytest.raises(ProviderPermanentError):
         provider.plan_routes(request)
+
+
+def test_transport_timeout_maps_to_transient_error() -> None:
+    def failing_transport(url: str, headers: object) -> bytes:
+        raise TimeoutError("connection timed out")
+
+    provider = OsrmRoutingProvider(transport=failing_transport)
+    with pytest.raises(ProviderTransientError):
+        provider.geocode("Chicago, IL")

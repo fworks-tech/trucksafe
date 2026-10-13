@@ -52,11 +52,13 @@ def _decode_payload(body: bytes, *, what: str) -> object:
         raise ProviderTransientError(f"osrm {what}: invalid payload") from exc
 
 
-def _first_us_point(payload: object) -> tuple[float | None, float | None]:
+def _first_us_point(payload: object) -> Coordinate | None:
     """Extract the first US point from a Photon FeatureCollection.
 
-    Returns (None, None) when nothing usable arrived; malformed shapes
-    are transient (the next request may succeed).
+    Returns None when nothing usable arrived; malformed shapes are
+    transient (the next request may succeed). A point is only returned
+    when both coordinates are finite, so callers never see half-missing
+    values.
     """
     if not isinstance(payload, dict):
         raise ProviderTransientError("osrm geocode: invalid payload")
@@ -81,8 +83,8 @@ def _first_us_point(payload: object) -> tuple[float | None, float | None]:
         except (TypeError, ValueError):
             continue
         if isfinite(latitude) and isfinite(longitude):
-            return latitude, longitude
-    return None, None
+            return Coordinate(latitude=latitude, longitude=longitude)
+    return None
 
 
 class OsrmRoutingProvider:
@@ -100,6 +102,18 @@ class OsrmRoutingProvider:
         self._transport = transport or _default_transport
         self.calls = 0
 
+    def _get(self, url: str) -> bytes:
+        """GET url, mapping transport failures to transient provider errors.
+
+        The injected transport (stdlib urllib by default) raises raw
+        network errors; they must never escape the adapter unmapped, or
+        callers see internals instead of the documented 503 path.
+        """
+        try:
+            return self._transport(url, {"User-Agent": _USER_AGENT})
+        except (TimeoutError, OSError) as exc:
+            raise ProviderTransientError(f"osrm transport failure: {exc}") from exc
+
     def geocode(self, address: str) -> Coordinate:
         """Resolve a place name with Photon; empty results are permanent."""
         self.calls += 1
@@ -108,16 +122,13 @@ class OsrmRoutingProvider:
             raise ProviderPermanentError("osrm provider cannot geocode a blank address")
         query = urlparse.urlencode({"q": key, "limit": 1, "bbox": "-125,25,-67,48"})
         payload = _decode_payload(
-            self._transport(
-                f"{self._geocode_url}/api/?{query}",
-                {"User-Agent": _USER_AGENT},
-            ),
+            self._get(f"{self._geocode_url}/api/?{query}"),
             what="geocode",
         )
-        latitude, longitude = _first_us_point(payload)
-        if latitude is None:
+        point = _first_us_point(payload)
+        if point is None:
             raise ProviderPermanentError(f"osrm provider cannot geocode {key!r}")
-        return Coordinate(latitude=latitude, longitude=longitude)
+        return point
 
     def plan_routes(
         self, request: RoutePlanRequest
@@ -146,7 +157,7 @@ class OsrmRoutingProvider:
             f"?overview=full&geometries=geojson&alternatives=3"
         )
         payload = _decode_payload(
-            self._transport(f"{self._base_url}{path}", {"User-Agent": _USER_AGENT}),
+            self._get(f"{self._base_url}{path}"),
             what="route",
         )
         if not isinstance(payload, dict):
@@ -231,7 +242,7 @@ class OsrmRoutingProvider:
             f"?overview=full&geometries=geojson"
         )
         payload = _decode_payload(
-            self._transport(f"{self._base_url}{path}", {"User-Agent": _USER_AGENT}),
+            self._get(f"{self._base_url}{path}"),
             what="route",
         )
         if not isinstance(payload, dict) or payload.get("code") != "Ok":

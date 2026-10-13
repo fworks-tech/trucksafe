@@ -80,7 +80,7 @@ SECRET_KEY: str = _resolve_secret_key(
 
 ALLOWED_HOSTS: list[str] = _parse_allowed_hosts(os.environ.get("ALLOWED_HOSTS"))
 
-# Provider selection. ``osrm`` resolves to the road-following OSRM/Nominatim
+# Provider selection. ``osrm`` resolves to the road-following OSRM/Photon
 # adapter (no credentials); a dotted path selects any custom adapter;
 # unset keeps the deterministic mocks. The factory instantiates whatever
 # is configured, so no view or service code changes with the provider.
