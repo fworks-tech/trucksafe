@@ -170,9 +170,10 @@ describe('RoutePlanPage map integration', () => {
     expect(screen.queryByText('Map preview')).not.toBeInTheDocument();
   });
 
-  it('falls back to the accessible route list when the map cannot start', async () => {
+  it('falls back to the accessible route cards when the map cannot start', async () => {
     // jsdom has no WebGL, so the lazy map section degrades to its
-    // fallback while the selection list stays fully working.
+    // fallback while the bottom-sheet cards stay fully working — and no
+    // second floating selection surface appears either.
     setScenario('success');
     renderWithProviders(<RoutePlanPage />);
     await fillAndSubmit();
@@ -180,12 +181,12 @@ describe('RoutePlanPage map integration', () => {
     expect(
       await screen.findByText('The interactive map could not be loaded'),
     ).toBeInTheDocument();
-    expect(screen.getAllByRole('radio')).toHaveLength(3);
-    expect(screen.getByRole('radio', { name: /route 1.*recommended/i })).toBeChecked();
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Show on map' })).toHaveLength(2);
   });
 
   it(
-    'syncs card and list selection and resets on a new plan',
+    'syncs selection through the cards and resets on a new plan',
     { timeout: 15000 },
     async () => {
       setScenario('success');
@@ -195,23 +196,19 @@ describe('RoutePlanPage map integration', () => {
       await screen.findByText('Route alternatives (3)');
       await screen.findByText('The interactive map could not be loaded');
 
-      // Card -> list.
+      // Card button selects; the non-recommended card gains the Selected chip.
       await user.click(screen.getAllByRole('button', { name: 'Show on map' })[0]!);
-      expect(screen.getByRole('radio', { name: /route 2/i })).toBeChecked();
-
-      // List -> card.
-      await user.click(screen.getByRole('radio', { name: /route 3/i }));
       expect(screen.getByRole('button', { name: 'Selected on map' })).toBeInTheDocument();
 
       // A new plan clears the viewing selection back to the recommendation.
       await user.click(screen.getByRole('button', { name: /start new plan/i }));
       await waitFor(() => {
-        expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+        expect(screen.queryByText('Route alternatives (3)')).not.toBeInTheDocument();
       });
       await user.click(screen.getByRole('button', { name: /plan route/i }));
       await screen.findByText('Route alternatives (3)');
       await screen.findByText('The interactive map could not be loaded');
-      expect(screen.getByRole('radio', { name: /route 1.*recommended/i })).toBeChecked();
+      expect(screen.getByText('Recommended: Route 1')).toBeInTheDocument();
     },
   );
 

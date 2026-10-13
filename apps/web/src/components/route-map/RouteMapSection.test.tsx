@@ -150,6 +150,7 @@ describe('RouteMapSection', () => {
         response={makeRoutePlan()}
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
+        weatherGrid={null}
       />,
     );
     unmount();
@@ -160,7 +161,7 @@ describe('RouteMapSection', () => {
     await waitFor(() => expect(map!.removed).toBe(true));
   });
 
-  it('renders the map, legend, and accessible route list', async () => {
+  it('renders the map and legend with a single selection surface elsewhere', async () => {
     stubWebgl();
     const plan = makeRoutePlan();
     renderWithProviders(
@@ -168,6 +169,7 @@ describe('RouteMapSection', () => {
         response={plan}
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
+        weatherGrid={null}
       />,
     );
     expect(screen.getByLabelText('Loading map')).toBeInTheDocument();
@@ -179,19 +181,14 @@ describe('RouteMapSection', () => {
       screen.getByRole('region', { name: /interactive route map/i }),
     ).toBeInTheDocument();
     expect(screen.getByText('Map legend')).toBeInTheDocument();
-    const options = screen.getAllByRole('radio');
-    expect(options).toHaveLength(3);
-    expect(
-      screen.getByRole('radio', { name: /route 1.*recommended/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('radio', { name: /route 2.*alternative/i }),
-    ).toBeInTheDocument();
+    // Route selection lives in the bottom-sheet cards, never in a second
+    // floating panel over the map.
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+    expect(screen.queryByText('Select a route to inspect')).not.toBeInTheDocument();
   });
 
-  it('syncs selection from the list, the map, and back', async () => {
+  it('syncs selection from the map without a floating list', async () => {
     stubWebgl();
-    const user = userEvent.setup();
     const seen: string[] = [];
     const plan = makeRoutePlan();
     const { rerender } = renderWithProviders(
@@ -199,20 +196,18 @@ describe('RouteMapSection', () => {
         response={plan}
         selectedRouteId="route-1"
         onSelectRoute={(id) => seen.push(id)}
+        weatherGrid={null}
       />,
     );
     FakeMap.instances[0]?.emit('load');
     await waitFor(() => {
       expect(screen.queryByLabelText('Loading map')).not.toBeInTheDocument();
     });
-    // List -> callback.
-    await user.click(screen.getByRole('radio', { name: /route 2.*alternative/i }));
-    expect(seen).toEqual(['route-2']);
-    // Map click -> callback.
+    // Map click -> callback (card selection lives in the bottom sheet).
     FakeMap.instances[0]?.clickLayer('trucksafe-route-lines', {
       features: [{ properties: { routeId: 'route-3' } }],
     });
-    expect(seen).toEqual(['route-2', 'route-3']);
+    expect(seen).toEqual(['route-3']);
     // Prop change -> adapter emphasis, no refit.
     const map = FakeMap.instances[0];
     const fitsBefore = map?.fitBoundsCalls ?? 0;
@@ -221,6 +216,7 @@ describe('RouteMapSection', () => {
         response={plan}
         selectedRouteId="route-2"
         onSelectRoute={(id) => seen.push(id)}
+        weatherGrid={null}
       />,
     );
     await waitFor(() => {
@@ -244,6 +240,7 @@ describe('RouteMapSection', () => {
         response={plan}
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
+        weatherGrid={null}
       />,
     );
     FakeMap.instances[0]?.emit('load');
@@ -279,12 +276,14 @@ describe('RouteMapSection', () => {
         response={plan}
         selectedRouteId="route-1"
         onSelectRoute={(id) => seen.push(id)}
+        weatherGrid={null}
       />,
     );
     expect(screen.getByText('Map unavailable for this result')).toBeInTheDocument();
     expect(FakeMap.instances).toHaveLength(0);
-    // The list alternative still works.
-    expect(screen.getByRole('radio', { name: /route 1.*no map geometry/i }));
+    // No fallback selection list on the map either: the bottom-sheet
+    // cards are the single selection surface.
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
     expect(seen).toEqual([]);
   });
 
@@ -296,6 +295,7 @@ describe('RouteMapSection', () => {
         response={makeRoutePlan()}
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
+        weatherGrid={null}
       />,
     );
     FakeMap.instances[0]?.emit('error');
@@ -313,6 +313,7 @@ describe('RouteMapSection', () => {
         response={makeRoutePlan()}
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
+        weatherGrid={null}
       />,
     );
     FakeMap.instances[0]?.emit('load');
@@ -332,6 +333,7 @@ describe('RouteMapSection', () => {
         })}
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
+        weatherGrid={null}
       />,
     );
     const results = await axe.run(fallback.container, {

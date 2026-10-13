@@ -16,7 +16,7 @@ import { WarningList } from './WarningList';
 import { renderWithProviders } from '../../../test/render';
 
 describe('RouteCard', () => {
-  it('identifies the recommended route and its stats', () => {
+  it('identifies the recommended route without badge overload', () => {
     renderWithProviders(
       <RouteCard
         route={makeRoute('route-1', { recommended: true })}
@@ -26,7 +26,29 @@ describe('RouteCard', () => {
     );
     expect(screen.getByText('Recommended')).toBeInTheDocument();
     expect(screen.getByText('Route 1')).toBeInTheDocument();
-    expect(screen.getByText('Eligible')).toBeInTheDocument();
+    // Eligible is the default state: no chip, no noise.
+    expect(screen.queryByText('Eligible')).not.toBeInTheDocument();
+    expect(screen.queryByText('Selected')).not.toBeInTheDocument();
+  });
+
+  it('shows the Selected chip only when the choice differs from the recommendation', async () => {
+    const user = userEvent.setup();
+    const seen: string[] = [];
+    const plan = makeRoutePlan();
+    renderWithProviders(
+      <RouteComparison
+        routes={plan.routes}
+        recommendedRouteId={plan.recommended_route_id}
+        selectedRouteId="route-2"
+        onSelectRoute={(id) => seen.push(id)}
+      />,
+    );
+    // route-2 is selected but not recommended: exactly one Selected chip.
+    expect(screen.getAllByText('Selected')).toHaveLength(1);
+    // Tapping the card body selects too (pointer convenience; the button
+    // remains the keyboard path).
+    await user.click(screen.getByText('Route 3'));
+    expect(seen).toContain('route-3');
   });
 
   it('never shows an ineligible route as recommended', () => {
@@ -84,7 +106,7 @@ describe('RouteComparison', () => {
       <RouteComparison
         routes={plan.routes}
         recommendedRouteId={plan.recommended_route_id}
-        selectedRouteId="route-1"
+        selectedRouteId="route-2"
         onSelectRoute={(id) => seen.push(id)}
       />,
     );
@@ -96,12 +118,12 @@ describe('RouteComparison', () => {
     const showButtons = screen.getAllByRole('button', { name: 'Show on map' });
     expect(showButtons).toHaveLength(2);
     await user.click(showButtons[0]!);
-    expect(seen).toEqual(['route-2']);
+    expect(seen).toEqual(['route-1']);
     rerender(
       <RouteComparison
         routes={plan.routes}
         recommendedRouteId={plan.recommended_route_id}
-        selectedRouteId="route-2"
+        selectedRouteId="route-3"
         onSelectRoute={(id) => seen.push(id)}
       />,
     );
@@ -114,6 +136,9 @@ describe('RecommendationSummary', () => {
     const plan = makeRoutePlan();
     renderWithProviders(<RecommendationSummary response={plan} requestId="req-1" />);
     expect(screen.getByText('Recommended: Route 1')).toBeInTheDocument();
+    // Plain user language up front; raw criteria behind a disclosure.
+    expect(screen.getByText(/lowest overall weather risk/)).toBeInTheDocument();
+    expect(screen.getByText('Technical details')).toBeInTheDocument();
     expect(screen.getByText(/deterministic route ranking criteria/)).toBeInTheDocument();
     expect(screen.getByText(/severe_miles/)).toBeInTheDocument();
   });
