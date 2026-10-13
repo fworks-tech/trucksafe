@@ -22,6 +22,40 @@ backend allows.
   `POST /api/v1/route-plans` Chicago → Houston returns 3 routes with a
   deterministic recommendation; preflight from a `vercel.app` origin is
   echoed, other origins are not.
+- Routing mode on the demo is the deterministic **mock** provider
+  (`TRUCKSAFE_ROUTING_PROVIDER` unset): geometry is straight corridors
+  (route polyline ≈ great-circle distance, circuity ≈ 1.00), and every
+  response self-identifies with `"routing_provider": "mock"`,
+  `"mock_mode": true`, plus a warning the frontend renders as a
+  "Demonstration geometry" banner.
+
+## Production routing (road network)
+
+Set `TRUCKSAFE_ROUTING_PROVIDER=osrm` in the backend environment and
+restart the container to serve road-following geometry: OSRM
+`driving` profile with `overview=full&geometries=geojson` plus up to 3
+alternatives (via-point re-routing pads to three when OSRM returns
+fewer). No credentials; needs outbound internet to
+`router.project-osrm.org` (geocoding via `photon.komoot.io`).
+
+- Geometry contract: GeoJSON `LineString`, WGS84 `[lon, lat]`, full
+  provider polyline (no straight-line substitution anywhere —
+  checkpoints use cumulative route distance, the frontend renders the
+  polyline verbatim). The adapter rejects malformed shapes
+  (non-finite/out-of-range coordinates, swapped axis order, totals that
+  disagree with the polyline) and surfaces them as `422`/`503`, never
+  as silent mock geometry.
+- Failure behavior: no silent fallback exists. OSRM errors propagate as
+  the documented `422`/`503` envelopes after 3 transient-only attempts
+  (8 s timeout per attempt).
+- Truck limitation: the public OSRM demo server runs a **car profile**
+  with no truck restrictions (height, weight, hazmat, truck-prohibited
+  roads). Treat road geometry as corridor-accurate but not
+  truck-legal; a truck-aware profile is a follow-up, not this slice.
+- Load weight stays in **pounds** end to end (`load_weight_lb`):
+  the form defaults to `30000` with a `30000` example placeholder, and
+  the `>30,000` / `>40,000` rules compare exclusive boundaries
+  (`30000` does not trigger, `30000.01` does).
 - App Runner was attempted first but the account's free plan cannot
   subscribe to it (`SubscriptionRequiredException`); EC2 + CloudFront
   is the fallback.
