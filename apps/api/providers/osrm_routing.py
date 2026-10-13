@@ -8,6 +8,7 @@ never touch the network.
 Only normalized domain types cross this boundary: WGS84 coordinates in
 canonical units. Provider URLs, meters, and GeoJSON ordering stay here.
 """
+
 import json
 from collections.abc import Callable, Mapping
 from math import isfinite
@@ -105,9 +106,7 @@ class OsrmRoutingProvider:
         key = address.strip()
         if not key:
             raise ProviderPermanentError("osrm provider cannot geocode a blank address")
-        query = urlparse.urlencode(
-            {"q": key, "limit": 1, "bbox": "-125,25,-67,48"}
-        )
+        query = urlparse.urlencode({"q": key, "limit": 1, "bbox": "-125,25,-67,48"})
         payload = _decode_payload(
             self._transport(
                 f"{self._geocode_url}/api/?{query}",

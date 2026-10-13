@@ -304,7 +304,7 @@ def test_mock_geocode_resolves_known_addresses() -> None:
 
 
 def test_mock_geocode_places_demo_cities_at_real_coordinates() -> None:
-    """ Cities offered by the frontend must land on the true map location.
+    """Cities offered by the frontend must land on the true map location.
 
     Regression: "Houston, TX" once hashed to a point over Florida because
     the mock table only knew four cities.
