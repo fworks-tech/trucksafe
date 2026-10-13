@@ -7,9 +7,12 @@ import {
   Card,
   CardContent,
   Chip,
+  IconButton,
   Typography,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { useState } from 'react';
 
 import { statusTokens } from '../../app/theme';
 import { formatScore } from '../../lib/format';
@@ -30,14 +33,17 @@ interface RecommendationSummaryProps {
 export function RecommendationSummary({
   response,
   requestId,
-}: RecommendationSummaryProps): React.JSX.Element {
+}: RecommendationSummaryProps): React.JSX.Element | null {
   const { recommended_route_id: recommendedId, recommendation_reason: reason } = response;
   const token = statusTokens.recommended;
   const labels = routeLabelsById(response.routes);
+  // Dismissible to cut sidebar noise; fresh mount per plan resets it.
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
 
   if (recommendedId === null) {
     return (
-      <Alert severity="warning" role="status">
+      <Alert severity="warning" role="status" onClose={() => setDismissed(true)}>
         <Typography variant="subtitle1" component="p" fontWeight={700}>
           No eligible route available.
         </Typography>
@@ -54,7 +60,16 @@ export function RecommendationSummary({
       }}
     >
       <CardContent>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 1,
+            mb: 1,
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
           <Chip
             label={`Recommended: ${labels[recommendedId] ?? recommendedId}`}
             sx={{
@@ -64,6 +79,14 @@ export function RecommendationSummary({
               fontWeight: 700,
             }}
           />
+          <IconButton
+            type="button"
+            size="small"
+            aria-label="Dismiss recommendation"
+            onClick={() => setDismissed(true)}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
         </Box>
         <Typography variant="body2">
           Recommended because it has the lowest overall weather risk and travel time.

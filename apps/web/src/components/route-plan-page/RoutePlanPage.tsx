@@ -51,6 +51,9 @@ export function RoutePlanPage(): React.JSX.Element {
   // from the backend recommendation; never stored server-side.
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'plan' | 'routes'>('plan');
+  // Dismissible mock-source notice (sidebar noise); it unmounts with
+  // the response on every submit, so dismissal resets per plan.
+  const [mockNoticeDismissed, setMockNoticeDismissed] = useState(false);
   // Origin city driving the pre-plan background map. Unknown free text
   // keeps the previous viewport (lookup returns null, center is unchanged).
   const [originCity, setOriginCity] = useState<string>(DEFAULT_ORIGIN_CITY);
@@ -206,8 +209,8 @@ export function RoutePlanPage(): React.JSX.Element {
           simulated, not live.
         </Typography>
 
-        {response !== null && response.mock_mode && (
-          <Alert severity="warning" sx={{ mb: 2 }}>
+        {response !== null && response.mock_mode && !mockNoticeDismissed && (
+          <Alert severity="warning" onClose={() => setMockNoticeDismissed(true)} sx={{ mb: 2 }}>
             Demonstration geometry — this plan uses the mock routing provider, not live
             road data. Routes are straight corridors, and load rules still apply in
             pounds.
