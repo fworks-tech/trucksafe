@@ -299,6 +299,10 @@ integrations exist yet — routing, geocoding, and weather go through
 deterministic mock adapters resolved by the provider factory — so no
 `.env` file is required to run the backend locally.
 
+Routing provider selection is opt-in via `TRUCKSAFE_ROUTING_PROVIDER`: `mock`
+(default, offline, deterministic) or `osrm` (real road geometry via the public
+OSRM demo server plus Photon geocoding; no key needed, needs internet).
+
 Never commit `.env` files or private credentials.
 
 ---
