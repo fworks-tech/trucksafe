@@ -66,12 +66,29 @@ export const theme = createTheme({
             transitionDuration: '0.01ms !important',
           },
         },
+        // Subtle thin scrollbars; scrolling and focus stay native so
+        // keyboard and assistive-tech behavior is untouched.
+        '*': {
+          scrollbarWidth: 'thin',
+          scrollbarColor: '#b0bec5 transparent',
+        },
+        '*::-webkit-scrollbar': { width: 8, height: 8 },
+        '*::-webkit-scrollbar-thumb': {
+          background: '#b0bec5',
+          borderRadius: 4,
+        },
+        '*::-webkit-scrollbar-track': { background: 'transparent' },
       },
     },
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: {
         root: { minHeight: 44 },
+      },
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: { textTransform: 'none', fontWeight: 600, minHeight: 48 },
       },
     },
     MuiTextField: {

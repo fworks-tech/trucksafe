@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { categoryForStatus, RoutePlanApiError, USER_MESSAGES } from './errors';
+import {
+  categoryForStatus,
+  RoutePlanApiError,
+  USER_MESSAGES,
+  weatherUserMessage,
+} from './errors';
 
 describe('categoryForStatus', () => {
   it('maps documented statuses to categories', () => {
@@ -50,5 +55,26 @@ describe('RoutePlanApiError', () => {
       backendCode: 'INVALID_REQUEST',
       backendMessage: 'origin: blank',
     });
+  });
+
+  it('never reuses route-plan wording for a weather failure', () => {
+    for (const category of Object.keys(USER_MESSAGES) as (keyof typeof USER_MESSAGES)[]) {
+      const message = weatherUserMessage(
+        new RoutePlanApiError({
+          category,
+          status: null,
+          requestId: null,
+          backendCode: null,
+          backendMessage: null,
+        }),
+      );
+      expect(message).not.toBe(USER_MESSAGES[category]);
+      expect(message.toLowerCase()).not.toContain('route plan');
+    }
+  });
+
+  it('falls back to unexpected weather wording for unknown errors', () => {
+    expect(weatherUserMessage(new Error('boom'))).toMatch(/weather|forecast/i);
+    expect(weatherUserMessage('nope')).toMatch(/weather|forecast/i);
   });
 });

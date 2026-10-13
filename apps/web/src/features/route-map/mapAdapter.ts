@@ -25,6 +25,7 @@ import type {
   NormalizedWeatherGrid,
 } from './geo';
 import { HEATMAP_RISK_COLORS, HEATMAP_RISK_RADIUS } from './geo';
+import { riskColors } from '../route-planning/riskColors';
 
 const ROUTES_SOURCE = 'trucksafe-routes';
 const CHECKPOINTS_SOURCE = 'trucksafe-checkpoints';
@@ -68,22 +69,77 @@ const LINE_COLORS: Record<RouteLineEntry['state'], string> = {
   'no-travel': '#5c0a14',
 };
 
+const LINE_EMPHASIS_WIDTH: Record<RouteLineEntry['state'], number> = {
+  'recommended-selected': 7,
+  recommended: 5,
+  selected: 6,
+  eligible: 3,
+  ineligible: 3,
+  'no-travel': 4,
+};
+
+const RISK_LINE_WIDTH: Record<string, number> = {
+  LOW: 3,
+  MODERATE: 3,
+  HIGH: 3.5,
+  SEVERE: 4,
+  NO_TRAVEL: 4.5,
+  unavailable: 2,
+};
+
+/**
+ * Per-feature line styling, computed here instead of through mapbox-gl
+ * `match` expressions: `match` labels must be constants, so a
+ * "risk first, state fallback" rule cannot be expressed in one valid
+ * expression. MapLibre receives plain `['get', ...]` paint instead —
+ * impossible to mis-validate at runtime, and unit-testable.
+ */
+export interface LineStyle {
+  color: string;
+  width: number;
+  opacity: number;
+  /** Dash pattern key resolved by the layer's `line-dasharray` match. */
+  dash: 'solid' | 'fine' | 'long';
+}
+
+export function lineStyleFor(
+  state: RouteLineEntry['state'],
+  risk: string | null,
+): LineStyle {
+  const emphasis = state === 'selected' || state === 'recommended-selected';
+  const color =
+    risk !== null && risk !== 'unavailable'
+      ? (SEGMENT_COLORS[risk] ?? LINE_COLORS[state])
+      : LINE_COLORS[state];
+  const riskWidth = risk !== null ? (RISK_LINE_WIDTH[risk] ?? 3) : 0;
+  const width = Math.max(riskWidth, LINE_EMPHASIS_WIDTH[state]);
+  let opacity = 0.85;
+  if (emphasis) opacity = 1;
+  else if (state === 'recommended') opacity = 0.95;
+  else if (state === 'ineligible') opacity = 0.7;
+  if (risk === 'unavailable') opacity = Math.min(opacity, 0.5);
+  let dash: LineStyle['dash'] = 'solid';
+  if (risk === 'NO_TRAVEL' || state === 'no-travel') dash = 'long';
+  else if (risk === 'unavailable' || state === 'ineligible') dash = 'fine';
+  return { color, width: Math.max(width, 2), opacity, dash };
+}
+
 const CHECKPOINT_COLORS: Record<string, string> = {
-  LOW: '#1b5e20',
-  MODERATE: '#7a5c00',
-  HIGH: '#8a3c00',
-  SEVERE: '#a31226',
-  NO_TRAVEL: '#5c0a14',
-  unavailable: '#78909c',
+  LOW: riskColors.LOW,
+  MODERATE: riskColors.MODERATE,
+  HIGH: riskColors.HIGH,
+  SEVERE: riskColors.SEVERE,
+  NO_TRAVEL: riskColors.NO_TRAVEL,
+  unavailable: riskColors.UNAVAILABLE,
 };
 
 const SEGMENT_COLORS: Record<string, string> = {
-  LOW: '#1b5e20',
-  MODERATE: '#7a5c00',
-  HIGH: '#8a3c00',
-  SEVERE: '#a31226',
-  NO_TRAVEL: '#5c0a14',
-  unavailable: '#78909c',
+  LOW: riskColors.LOW,
+  MODERATE: riskColors.MODERATE,
+  HIGH: riskColors.HIGH,
+  SEVERE: riskColors.SEVERE,
+  NO_TRAVEL: riskColors.NO_TRAVEL,
+  unavailable: riskColors.UNAVAILABLE,
 };
 
 function webglAvailable(): boolean {
@@ -122,6 +178,7 @@ function asExpression<T>(value: unknown): T {
 /** Owns one MapLibre instance: sources, layers, markers, listeners. */
 export class RouteMapAdapter {
   private layersReady = false;
+  private lastBounds: MapBounds | null = null;
 
   private constructor(
     private readonly map: MapLibreMap,
@@ -202,8 +259,11 @@ export class RouteMapAdapter {
         if (coordinates !== undefined) this.showPopup(coordinates);
       }
     });
-    this.map.on('error', () => {
-      this.callbacks.onRuntimeError?.();
+    this.map.on('error', (event: { error?: { message?: string } }) => {
+      // One bad tile must not tear down the whole map: only layer/style
+      // errors mean the route rendering itself is broken.
+      const message = event?.error?.message ?? '';
+      if (/layer|style/i.test(message)) this.callbacks.onRuntimeError?.();
     });
   }
 
@@ -220,6 +280,7 @@ export class RouteMapAdapter {
       const segmentFeatures = routes.flatMap((route) => {
         const routeSegments = segments?.[route.routeId];
         if (!routeSegments || routeSegments.length === 0) {
+          const style = lineStyleFor(route.state, null);
           return [
             {
               type: 'Feature' as const,
@@ -227,6 +288,7 @@ export class RouteMapAdapter {
                 routeId: route.routeId,
                 riskLevel: 'unavailable',
                 state: route.state,
+                ...style,
               },
               geometry: {
                 type: 'LineString' as const,
@@ -241,6 +303,7 @@ export class RouteMapAdapter {
             routeId: route.routeId,
             riskLevel: segment.risk ?? 'unavailable',
             state: route.state,
+            ...lineStyleFor(route.state, segment.risk ?? null),
           },
           geometry: {
             type: 'LineString' as const,
@@ -255,7 +318,11 @@ export class RouteMapAdapter {
     } else {
       const routeFeatures = routes.map((route) => ({
         type: 'Feature' as const,
-        properties: { routeId: route.routeId, state: route.state },
+        properties: {
+          routeId: route.routeId,
+          state: route.state,
+          ...lineStyleFor(route.state, null),
+        },
         geometry: { type: 'LineString' as const, coordinates: route.coordinates },
       }));
       this.upsertSource(ROUTES_SOURCE, {
@@ -270,63 +337,15 @@ export class RouteMapAdapter {
         type: 'line',
         source: ROUTES_SOURCE,
         paint: {
-          'line-color': asExpression<LinePaint['line-color']>([
-            'match',
-            ['get', 'riskLevel'],
-            ...Object.entries(SEGMENT_COLORS).flat(),
-            ['get', 'state'],
-            ...Object.entries(LINE_COLORS).flat(),
-            '#455a64',
-          ]),
-          'line-width': asExpression<LinePaint['line-width']>([
-            'match',
-            ['get', 'riskLevel'],
-            'NO_TRAVEL',
-            4,
-            'SEVERE',
-            3.5,
-            'HIGH',
-            3,
-            'MODERATE',
-            3,
-            'LOW',
-            3,
-            'unavailable',
-            2,
-            ['get', 'state'],
-            'recommended-selected',
-            7,
-            'recommended',
-            5,
-            'selected',
-            6,
-            3,
-          ]),
-          'line-opacity': asExpression<LinePaint['line-opacity']>([
-            'match',
-            ['get', 'riskLevel'],
-            'NO_TRAVEL',
-            0.9,
-            'unavailable',
-            0.4,
-            ['get', 'state'],
-            'recommended-selected',
-            1,
-            'selected',
-            1,
-            'recommended',
-            0.95,
-            0.7,
-          ]),
+          'line-color': ['get', 'color'],
+          'line-width': ['get', 'width'],
+          'line-opacity': ['get', 'opacity'],
           'line-dasharray': asExpression<LinePaint['line-dasharray']>([
             'match',
-            ['get', 'riskLevel'],
-            'NO_TRAVEL',
+            ['get', 'dash'],
+            'long',
             ['literal', [5, 2.5]],
-            'unavailable',
-            ['literal', [2, 2]],
-            ['get', 'state'],
-            'ineligible',
+            'fine',
             ['literal', [2, 2]],
             ['literal', [1]],
           ]),
@@ -534,6 +553,7 @@ export class RouteMapAdapter {
 
   /** Fit the viewport to validated bounds; never animates on reduce-motion. */
   fitToBounds(bounds: MapBounds): void {
+    this.lastBounds = bounds;
     this.map.fitBounds(
       [
         [bounds.minLongitude, bounds.minLatitude],
@@ -541,6 +561,44 @@ export class RouteMapAdapter {
       ],
       { padding: 48, animate: !prefersReducedMotion() },
     );
+  }
+
+  /** Return to the last fitted route bounds (floating recenter control). */
+  recenter(): void {
+    if (this.lastBounds !== null) this.fitToBounds(this.lastBounds);
+  }
+
+  /** Step zoom in/out for touch users without pinch gestures. */
+  zoomBy(direction: 'in' | 'out'): void {
+    if (direction === 'in') this.map.zoomIn();
+    else this.map.zoomOut();
+  }
+
+  /** Toggle checkpoint layer visibility (floating control). */
+  setCheckpointsVisible(visible: boolean): void {
+    if (!this.layersReady) return;
+    const value = visible ? 'visible' : 'none';
+    for (const layer of [CHECKPOINT_LAYER, CHECKPOINT_SELECTED_LAYER]) {
+      try {
+        this.map.setLayoutProperty(layer, 'visibility', value);
+      } catch {
+        // Layer may be mid-teardown; visibility is not critical.
+      }
+    }
+  }
+
+  /** Toggle heatmap layer visibility without discarding its data. */
+  setHeatmapVisible(visible: boolean): void {
+    if (!this.layersReady || !this.map.getLayer(HEATMAP_LAYER)) return;
+    try {
+      this.map.setLayoutProperty(
+        HEATMAP_LAYER,
+        'visibility',
+        visible ? 'visible' : 'none',
+      );
+    } catch {
+      // Same as above: never break the textual route flow.
+    }
   }
 
   private showPopup(at: LngLat): void {
@@ -556,12 +614,13 @@ export class RouteMapAdapter {
     id: string,
     data: { type: 'FeatureCollection'; features: unknown[] },
   ): void {
-    if (this.layersReady) {
-      // GeoJSONSource is not exported as a type; narrow through unknown
-      // in this one spot instead of threading source handles around.
-      const source = this.map.getSource(id) as unknown as
-        { setData: (next: typeof data) => void } | undefined;
-      source?.setData(data);
+    // Existence of this source, not the shared layer-ready flag, decides
+    // add vs update: the heatmap source is created long after the route
+    // layers exist, and adding its layer without its source breaks the map.
+    const source = this.map.getSource(id) as unknown as
+      { setData: (next: typeof data) => void } | undefined;
+    if (source !== undefined) {
+      source.setData(data);
     } else {
       this.map.addSource(id, { type: 'geojson', data });
     }

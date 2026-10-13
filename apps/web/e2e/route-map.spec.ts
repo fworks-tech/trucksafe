@@ -26,7 +26,9 @@ async function submitValidPlan(page: Page): Promise<void> {
   await page.getByLabel(/departure date and time/i).fill('2026-10-12T14:30');
   await page.getByLabel(/load weight/i).fill('20000');
   await page.getByRole('button', { name: /plan route/i }).click();
-  await expect(page.getByText('Route alternatives (3)')).toBeVisible();
+  // First result render can race the cold lazy-map transform on a shared
+  // dev server; same allowance as expectMapRegion below.
+  await expect(page.getByText('Route alternatives (3)')).toBeVisible({ timeout: 20000 });
 }
 
 // The map section arrives via React.lazy: the first assertion waits out
@@ -38,10 +40,27 @@ async function expectMapRegion(page: Page): Promise<void> {
   });
 }
 
+/** Small screens start with the planning sheet expanded (bottom-sheet
+ * pattern); collapse it to interact with the floating map overlays. */
+async function collapseSheetIfExpanded(page: Page): Promise<void> {
+  const collapse = page.getByRole('button', { name: 'Collapse panel' });
+  if (await collapse.isVisible()) {
+    await collapse.click();
+  }
+}
+
 test('documents segment risk colors in the map legend', async ({ page }) => {
   await withEmptyBasemap(page);
   await submitValidPlan(page);
   await expectMapRegion(page);
+  await collapseSheetIfExpanded(page);
+
+  // On small screens the legend starts collapsed to keep the map clear;
+  // expand it before asserting the color decoding.
+  const expand = page.getByRole('button', { name: 'Expand map legend' });
+  if (await expand.isVisible()) {
+    await expand.click();
+  }
 
   // The legend is the accessible decoder for every map treatment, so the
   // segment colors drawn on the map are also stated as text.
@@ -78,13 +97,16 @@ test('synchronizes selection between route cards and the map', async ({ page }) 
   await submitValidPlan(page);
   await expectMapRegion(page);
 
-  // Card -> map list.
+  // Card -> map list. The RouteCard lives in the planning panel, which is
+  // visible (expanded) on mobile by default.
   await page.getByRole('button', { name: 'Show on map' }).first().click();
   await expect(page.getByRole('button', { name: 'Selected on map' })).toHaveCount(1);
 
-  // Map list -> card.
-  await page.getByRole('radio', { name: /route-3/ }).click();
-  await expect(page.getByRole('radio', { name: /route-3/ })).toBeChecked();
+  // Map list -> card. The floating route radios sit over the map; on
+  // small screens collapse the sheet first so they are not covered.
+  await collapseSheetIfExpanded(page);
+  await page.getByRole('radio', { name: /route 3/i }).click();
+  await expect(page.getByRole('radio', { name: /route 3/i })).toBeChecked();
   await expect(page.getByRole('button', { name: 'Selected on map' })).toHaveCount(1);
 });
 
@@ -114,7 +136,7 @@ test('falls back safely when the map style fails', async ({ page }) => {
   });
   // Textual comparison is untouched by the map failure.
   await expect(page.getByText('Route alternatives (3)')).toBeVisible();
-  await expect(page.getByText(/Recommended: route-/)).toBeVisible();
+  await expect(page.getByText(/Recommended: Route /)).toBeVisible();
   // Retry re-fails deterministically and keeps the fallback.
   await page.getByRole('button', { name: /retry map/i }).click();
   await expect(page.getByText('The interactive map could not be loaded')).toBeVisible();

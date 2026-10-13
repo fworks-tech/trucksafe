@@ -16,6 +16,7 @@ const { FakeMap, FakeMarker, FakePopup, fakeState } = vi.hoisted(() => {
     addedSources: Array<{ id: string; spec: unknown }> = [];
     addedLayers: unknown[] = [];
     sourceUpdates: Record<string, unknown[]> = {};
+    sources: Record<string, { setData: (data: unknown) => void }> = {};
     filters: Record<string, unknown> = {};
     fitBoundsCalls: Array<{ bounds: unknown; options: unknown }> = [];
     removed = false;
@@ -51,18 +52,15 @@ const { FakeMap, FakeMarker, FakePopup, fakeState } = vi.hoisted(() => {
       );
     }
 
-    emit(event: string, ...args: never[]): void {
+    emit(event: string, ...args: unknown[]): void {
       for (const handler of this.handlers.filter((h) => h.event === event)) {
-        handler.fn(...args);
+        (handler.fn as (...a: unknown[]) => void)(...args);
       }
     }
 
     addSource(id: string, spec: unknown): void {
       this.addedSources.push({ id, spec });
-    }
-
-    getSource(id: string): { setData: (data: unknown) => void } {
-      return {
+      this.sources[id] = {
         setData: (data: unknown): void => {
           const updates = this.sourceUpdates[id] ?? [];
           updates.push(data);
@@ -71,9 +69,34 @@ const { FakeMap, FakeMarker, FakePopup, fakeState } = vi.hoisted(() => {
       };
     }
 
+    getSource(id: string): { setData: (data: unknown) => void } | undefined {
+      return this.sources[id];
+    }
+
     addLayer(layer: unknown): void {
       this.addedLayers.push(layer);
     }
+
+    getLayer(id: string): unknown {
+      return this.addedLayers.find((layer) => (layer as { id?: string }).id === id);
+    }
+
+    removeLayer(id: string): void {
+      this.addedLayers = this.addedLayers.filter(
+        (layer) => (layer as { id?: string }).id !== id,
+      );
+    }
+
+    removeSource(id: string): void {
+      delete this.sources[id];
+      this.addedSources = this.addedSources.filter((source) => source.id !== id);
+    }
+
+    setLayoutProperty(): void {}
+
+    zoomIn(): void {}
+
+    zoomOut(): void {}
 
     setFilter(layer: string, filter: unknown): void {
       this.filters[layer] = filter;
@@ -142,7 +165,31 @@ vi.mock('maplibre-gl', () => ({
   Popup: FakePopup,
 }));
 
-import { RouteMapAdapter, type CheckpointEntry, type RouteLineEntry } from './mapAdapter';
+import {
+  lineStyleFor,
+  RouteMapAdapter,
+  type CheckpointEntry,
+  type RouteLineEntry,
+} from './mapAdapter';
+
+describe('lineStyleFor', () => {
+  it('never emits a match-expression label (only plain per-feature values)', () => {
+    const selected = lineStyleFor('recommended-selected', 'HIGH');
+    expect(selected).toEqual({
+      color: expect.any(String),
+      width: expect.any(Number),
+      opacity: expect.any(Number),
+      dash: 'solid',
+    });
+    expect(selected.width).toBeGreaterThanOrEqual(7);
+    expect(lineStyleFor('no-travel', 'NO_TRAVEL').dash).toBe('long');
+    expect(lineStyleFor('eligible', 'unavailable').dash).toBe('fine');
+    // Colors are hex strings, never expression arrays.
+    for (const state of ['recommended', 'eligible', 'ineligible', 'no-travel'] as const) {
+      expect(lineStyleFor(state, null).color).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+  });
+});
 
 function stubWebgl(available: boolean): void {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
@@ -268,6 +315,83 @@ describe('RouteMapAdapter layers', () => {
     adapter.destroy();
   });
 
+  it('creates the heatmap source before its layer (regression: map teardown)', async () => {
+    const { adapter, map } = await readyAdapter();
+    adapter.setRoutes(LINES, POINTS);
+    const grid = {
+      cells: [
+        {
+          cellId: 'cell-1',
+          longitude: -87.5,
+          latitude: 41.5,
+          risk: 'HIGH' as const,
+          riskScore: 3,
+          riskReasons: [],
+          windMph: 40,
+          rainInchesPerHour: null,
+          snowInchesPerHour: null,
+        },
+      ],
+      bounds: null,
+      forecastStart: '2026-10-14T13:00:00Z',
+      forecastEnd: '2026-10-14T14:00:00Z',
+    };
+    adapter.setHeatmap(grid);
+    const sourceIds = map.addedSources.map((source) => source.id);
+    const layerIds = map.addedLayers.map((layer) => (layer as { id: string }).id);
+    expect(sourceIds).toContain('trucksafe-heatmap');
+    expect(layerIds).toContain('trucksafe-heatmap');
+    // Second update goes through setData, not a duplicate source.
+    adapter.setHeatmap(grid);
+    expect(map.addedSources.filter((s) => s.id === 'trucksafe-heatmap')).toHaveLength(1);
+    expect(map.sourceUpdates['trucksafe-heatmap']).toHaveLength(1);
+    adapter.destroy();
+  });
+
+  it('paints lines with per-feature values only (no match-expression labels)', async () => {
+    const { adapter, map } = await readyAdapter();
+    adapter.setRoutes(LINES, POINTS, {
+      'route-1': [
+        {
+          startIndex: 0,
+          endIndex: 1,
+          risk: 'NO_TRAVEL',
+          coordinates: LINES[0]!.coordinates,
+        },
+        {
+          startIndex: 1,
+          endIndex: 2,
+          risk: null,
+          coordinates: LINES[0]!.coordinates,
+        },
+      ],
+    });
+    const lineLayer = map.addedLayers.find(
+      (layer) => (layer as { id: string }).id === 'trucksafe-route-lines',
+    ) as { paint: Record<string, unknown> };
+    for (const key of ['line-color', 'line-width', 'line-opacity']) {
+      expect(lineLayer.paint[key]).toEqual(['get', key.slice(5)]);
+    }
+    const features = (
+      map.addedSources[0]!.spec as {
+        data: { features: Array<{ properties: Record<string, unknown> }> };
+      }
+    ).data.features;
+    expect(features[0]!.properties).toMatchObject({
+      color: expect.any(String),
+      width: expect.any(Number),
+      opacity: expect.any(Number),
+      dash: 'long',
+    });
+    expect(features[1]!.properties.dash).not.toBe('long');
+    // Every `match` label must be a constant, never an expression: the
+    // only match we emit is the dash toggle; labels sit at indexes 2 and 4.
+    const dash = lineLayer.paint['line-dasharray'] as unknown[];
+    expect(dash[0]).toBe('match');
+    expect([dash[2], dash[4]].every((label) => !Array.isArray(label))).toBe(true);
+    adapter.destroy();
+  });
+
   it('updates selection filters without refitting the viewport', async () => {
     const { adapter, map } = await readyAdapter();
     adapter.setRoutes(LINES, POINTS);
@@ -336,7 +460,7 @@ describe('RouteMapAdapter layers', () => {
     adapter.destroy();
   });
 
-  it('reports runtime errors after load and cleans up on destroy', async () => {
+  it('reports layer/style runtime errors and ignores transient tile errors', async () => {
     const onRuntimeError = vi.fn();
     const { adapter, map } = await readyAdapter({ onRuntimeError });
     adapter.setRoutes(LINES, POINTS);
@@ -345,7 +469,11 @@ describe('RouteMapAdapter layers', () => {
       destination: [-87.0, 41.0],
       recommendedMidpoint: [-87.3, 41.4],
     });
-    map.emit('error');
+    map.emit('error', { error: { message: 'tile 5/12/8: Could not load image' } });
+    expect(onRuntimeError).not.toHaveBeenCalled();
+    map.emit('error', {
+      error: { message: 'layer trucksafe-route-lines: bad expression' },
+    });
     expect(onRuntimeError).toHaveBeenCalledTimes(1);
     adapter.destroy();
     expect(map.removed).toBe(true);

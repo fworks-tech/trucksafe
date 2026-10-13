@@ -1,5 +1,5 @@
-import { Box, Skeleton, Stack, Typography } from '@mui/material';
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { Box, Skeleton, Typography, useMediaQuery } from '@mui/material';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -13,7 +13,10 @@ import { RouteMapAdapter } from '../../features/route-map/mapAdapter';
 import { mapStyleUrl } from '../../features/route-map/mapConfig';
 import type { RoutePlanResponse } from '../../features/route-planning/types';
 import { fetchWeatherGrid } from '../../features/route-planning/api/client';
+import { weatherUserMessage } from '../../features/route-planning/api/errors';
+import { theme } from '../../app/theme';
 import { MapCheckpointDetail } from './MapCheckpointDetail';
+import { MapControls } from './MapControls';
 import { MapRouteSelection, type RouteSelectionEntry } from './MapRouteSelection';
 import { RouteMapFallback } from './RouteMapFallback';
 import { RouteMapLegend } from './RouteMapLegend';
@@ -27,14 +30,22 @@ interface RouteMapSectionProps {
 
 type MapStatus = 'loading' | 'ready' | 'unavailable';
 
-const MAP_HEIGHT = { xs: 320, md: 440 };
+/** Debounce for slider-driven grid requests: one request per settled
+ * position, never one per drag step. */
+const GRID_DEBOUNCE_MS = 250;
 
-/** Interactive map for one route-plan result, lazily loaded.
+// Offset clears the sidebar (floating panel) at md and up.
+const SIDEBAR_OFFSET = { xs: 16, md: 420 };
+
+/**
+ * Full-viewport map layer for one route-plan result, lazily loaded.
  *
  * Owns the MapLibre lifecycle (one adapter per response, destroyed on
- * unmount or new result) and degrades to the textual comparison whenever
+ * unmount or new result) and degrades to floating textual panels whenever
  * geometry or the map itself is unavailable. Selection stays in the page
- * so map picks and route cards never diverge.
+ * so map picks and route cards never diverge. The route list, legend,
+ * controls, and forecast slider float over the map instead of stacking
+ * below it, keeping the map-first experience.
  */
 export function RouteMapSection({
   response,
@@ -44,6 +55,7 @@ export function RouteMapSection({
   const containerRef = useRef<HTMLDivElement>(null);
   const adapterRef = useRef<RouteMapAdapter | null>(null);
   const [mapStatus, setMapStatus] = useState<MapStatus>('loading');
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const [attempt, setAttempt] = useState(0);
   const [selectedCheckpointId, setSelectedCheckpointId] = useState<string | null>(null);
 
@@ -52,7 +64,13 @@ export function RouteMapSection({
   const [weatherGrid, setWeatherGrid] = useState<NormalizedWeatherGrid | null>(null);
   const [gridLoading, setGridLoading] = useState(false);
   const [gridError, setGridError] = useState<string | null>(null);
-  const [gridCache, setGridCache] = useState<Record<number, NormalizedWeatherGrid>>({});
+  const gridCacheRef = useRef<Record<number, NormalizedWeatherGrid>>({});
+  const gridSeqRef = useRef(0);
+  const gridAbortRef = useRef<AbortController | null>(null);
+
+  // Floating control visibility state.
+  const [checkpointsVisible, setCheckpointsVisible] = useState(true);
+  const [heatmapVisible, setHeatmapVisible] = useState(true);
 
   const model = useMemo(
     () =>
@@ -78,40 +96,58 @@ export function RouteMapSection({
   // Departure time from the first route's first checkpoint (all routes share same departure)
   const departureAt = response.routes[0]?.checkpoints[0]?.eta ?? new Date().toISOString();
 
-  // Fetch weather grid when forecast offset changes
   const fetchGrid = useCallback(
     async (offsetHours: number) => {
-      if (gridCache[offsetHours]) {
-        setWeatherGrid(gridCache[offsetHours]);
+      const cached = gridCacheRef.current[offsetHours];
+      if (cached !== undefined) {
+        setWeatherGrid(cached);
+        setGridError(null);
         return;
       }
+      // Stale-response guard: only the newest request may commit state.
+      const seq = (gridSeqRef.current += 1);
+      gridAbortRef.current?.abort();
+      const controller = new AbortController();
+      gridAbortRef.current = controller;
       setGridLoading(true);
       setGridError(null);
       try {
-        const result = await fetchWeatherGrid(response.id, offsetHours);
+        const result = await fetchWeatherGrid(response.id, offsetHours, {
+          signal: controller.signal,
+        });
+        if (seq !== gridSeqRef.current) return;
         const normalized = normalizeWeatherGrid(result.data);
+        gridCacheRef.current[offsetHours] = normalized;
         setWeatherGrid(normalized);
-        setGridCache((prev) => ({ ...prev, [offsetHours]: normalized }));
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Failed to load forecast';
-        setGridError(message);
+        if (seq !== gridSeqRef.current) return;
+        // Weather-specific wording: a failed forecast must never claim the
+        // route plan could not be created when the plan itself succeeded.
+        setGridError(weatherUserMessage(error));
         setWeatherGrid(null);
       } finally {
-        setGridLoading(false);
+        if (seq === gridSeqRef.current) setGridLoading(false);
       }
     },
-    [response.id, gridCache],
+    [response.id],
   );
 
+  // Debounced: settled slider position triggers exactly one fetch.
   useEffect(() => {
-    fetchGrid(forecastOffset);
+    const timer = setTimeout(() => {
+      void fetchGrid(forecastOffset);
+    }, GRID_DEBOUNCE_MS);
+    return (): void => {
+      clearTimeout(timer);
+    };
   }, [forecastOffset, fetchGrid]);
 
   // One adapter per response: create on mount/response change, destroy on
   // cleanup. The viewport fits once per response, never on selection.
   useEffect(() => {
     setSelectedCheckpointId(null);
+    setCheckpointsVisible(true);
+    setHeatmapVisible(true);
     if (!hasGeometry || styleUrl === '') {
       setMapStatus('unavailable');
       return;
@@ -123,7 +159,11 @@ export function RouteMapSection({
     }
     let cancelled = false;
     setMapStatus('loading');
-    let adapter: RouteMapAdapter | null = null;
+    // `created` is visible to the cleanup so a creation that finishes after
+    // unmount (StrictMode remount, fast response switch) is destroyed too;
+    // otherwise the abandoned instance empties the container and the live
+    // second instance renders into a dead element.
+    let created: RouteMapAdapter | null = null;
     RouteMapAdapter.create(container, styleUrl, {
       onRouteSelect: (routeId) => {
         onSelectRoute(routeId);
@@ -138,23 +178,30 @@ export function RouteMapSection({
         setMapStatus('unavailable');
       },
     })
-      .then((created) => {
+      .then((adapter) => {
         if (cancelled) {
-          created.destroy();
+          adapter.destroy();
           return;
         }
-        adapter = created;
-        adapterRef.current = created;
-        created.setRoutes(model.lines, model.checkpoints, model.segments);
-        if (model.origin !== null && model.destination !== null) {
-          created.setMarkers({
-            origin: model.origin,
-            destination: model.destination,
-            recommendedMidpoint: model.recommendedMidpoint,
-          });
+        created = adapter;
+        adapterRef.current = adapter;
+        try {
+          adapter.setRoutes(model.lines, model.checkpoints, model.segments);
+          if (model.origin !== null && model.destination !== null) {
+            adapter.setMarkers({
+              origin: model.origin,
+              destination: model.destination,
+              recommendedMidpoint: model.recommendedMidpoint,
+            });
+          }
+          if (model.bounds !== null) adapter.fitToBounds(model.bounds);
+          adapter.setSelected(selectedRouteId, null);
+        } catch {
+          created = null;
+          adapter.destroy();
+          setMapStatus('unavailable');
+          return;
         }
-        if (model.bounds !== null) created.fitToBounds(model.bounds);
-        created.setSelected(selectedRouteId, null);
         setMapStatus('ready');
       })
       .catch(() => {
@@ -162,15 +209,15 @@ export function RouteMapSection({
       });
     return () => {
       cancelled = true;
-      adapter?.destroy();
-      adapterRef.current = null;
+      created?.destroy();
+      if (adapterRef.current === created) adapterRef.current = null;
     };
     // Re-create only for a new response or an explicit retry: selection
     // flows through setSelected below so manual viewport moves survive.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [response.id, attempt, hasGeometry, styleUrl]);
 
-  // Update heatmap when weather grid changes
+  // Update heatmap when weather grid changes.
   useEffect(() => {
     if (mapStatus === 'ready') {
       adapterRef.current?.setHeatmap(weatherGrid);
@@ -198,23 +245,59 @@ export function RouteMapSection({
             (checkpoint) => checkpoint.checkpoint_id === selectedCheckpoint.checkpointId,
           ) ?? null);
 
-  // Clear heatmap and grid cache when route plan changes
+  // Clear heatmap, cache, and in-flight requests when the plan changes;
+  // the forecast offset is deliberately preserved across the new plan.
   useEffect(() => {
+    gridSeqRef.current += 1;
+    gridAbortRef.current?.abort();
+    gridCacheRef.current = {};
     setForecastOffset(0);
     setWeatherGrid(null);
-    setGridCache({});
     setGridError(null);
+    setGridLoading(false);
   }, [response.id]);
 
+  // Abort grid requests on unmount.
+  useEffect(() => {
+    return (): void => {
+      gridSeqRef.current += 1;
+      gridAbortRef.current?.abort();
+    };
+  }, []);
+
   return (
-    <section aria-label="Route map">
-      <Typography variant="h2" component="h2" gutterBottom>
+    <Box
+      component="section"
+      aria-label="Route map"
+      sx={{ position: 'absolute', inset: 0 }}
+    >
+      <Typography variant="h2" component="h2" sx={{ position: 'absolute', left: -9999 }}>
         Route map
       </Typography>
-      <Stack spacing={2}>
-        {!hasGeometry ? (
+      {!hasGeometry ? (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 16,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: { xs: 'calc(100% - 32px)', md: 480 },
+            zIndex: 4,
+          }}
+        >
           <RouteMapFallback reason="no-geometry" />
-        ) : mapStatus === 'unavailable' ? (
+        </Box>
+      ) : mapStatus === 'unavailable' ? (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 16,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: { xs: 'calc(100% - 32px)', md: 480 },
+            zIndex: 4,
+          }}
+        >
           <RouteMapFallback
             reason="map-unavailable"
             onRetry={() => {
@@ -222,62 +305,158 @@ export function RouteMapSection({
               setAttempt((count) => count + 1);
             }}
           />
-        ) : (
-          <Box sx={{ position: 'relative' }}>
-            <Box
-              ref={containerRef}
-              role="region"
-              aria-label="Interactive route map. The route list below selects the same routes."
-              aria-describedby="route-map-caption"
-              sx={{
-                height: MAP_HEIGHT,
-                borderRadius: 2,
-                overflow: 'hidden',
-                border: '1px solid #cfd8dc',
-                visibility: mapStatus === 'loading' ? 'hidden' : 'visible',
-              }}
-            />
-            {mapStatus === 'loading' && (
-              <Skeleton
-                variant="rectangular"
-                role="progressbar"
-                aria-label="Loading map"
-                sx={{
-                  position: 'absolute',
-                  inset: 0,
-                  height: MAP_HEIGHT,
-                  borderRadius: 2,
+        </Box>
+      ) : (
+        <Box
+          ref={containerRef}
+          role="region"
+          aria-label="Interactive route map. The route list below selects the same routes."
+          aria-describedby="route-map-caption"
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            visibility: mapStatus === 'loading' ? 'hidden' : 'visible',
+          }}
+        />
+      )}
+      {mapStatus === 'loading' && hasGeometry && (
+        <Skeleton
+          variant="rectangular"
+          role="progressbar"
+          aria-label="Loading map"
+          sx={{ position: 'absolute', inset: 0, borderRadius: 0 }}
+        />
+      )}
+      <Typography
+        id="route-map-caption"
+        variant="caption"
+        color="text.secondary"
+        sx={{ position: 'absolute', left: -9999 }}
+      >
+        Map markers summarize the route list that follows; every route, checkpoint, and
+        warning below stays available as text.
+      </Typography>
+
+      {/* Overlays are always available: the route list is the accessible
+          source of truth and must not depend on map render success. */}
+      <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3 }}>
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            bottom: { xs: 148, md: 150 },
+            width: { xs: 232, md: 300 },
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1,
+            alignItems: 'flex-end',
+            pointerEvents: 'none',
+            zIndex: 2,
+          }}
+        >
+          {mapStatus === 'ready' && (
+            <Box sx={{ pointerEvents: 'auto' }}>
+              <MapControls
+                onRecenter={() => adapterRef.current?.recenter()}
+                onZoomIn={() => adapterRef.current?.zoomBy('in')}
+                onZoomOut={() => adapterRef.current?.zoomBy('out')}
+                checkpointsVisible={checkpointsVisible}
+                onToggleCheckpoints={() => {
+                  const next = !checkpointsVisible;
+                  setCheckpointsVisible(next);
+                  adapterRef.current?.setCheckpointsVisible(next);
+                }}
+                heatmapAvailable={weatherGrid !== null}
+                heatmapVisible={heatmapVisible}
+                onToggleHeatmap={() => {
+                  const next = !heatmapVisible;
+                  setHeatmapVisible(next);
+                  adapterRef.current?.setHeatmapVisible(next);
                 }}
               />
-            )}
+            </Box>
+          )}
+          <Box
+            sx={{
+              pointerEvents: 'auto',
+              overflowY: 'auto',
+              minHeight: 0,
+              width: '100%',
+              p: 1.5,
+              borderRadius: 2,
+              bgcolor: 'rgba(255, 255, 255, 0.92)',
+              boxShadow: 3,
+            }}
+          >
+            <MapRouteSelection
+              entries={entries}
+              selectedRouteId={selectedRouteId}
+              onSelectRoute={onSelectRoute}
+            />
+          </Box>
+        </Box>
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: { xs: 148, md: 16 },
+            left: SIDEBAR_OFFSET,
+            right: 16,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-end',
+            gap: 1,
+            flexWrap: 'wrap',
+            // The row spans the full map width; only its children may
+            // receive clicks, or the empty area would block the panels
+            // beneath it.
+            pointerEvents: 'none',
+            zIndex: 2,
+          }}
+        >
+          <Box sx={{ pointerEvents: 'auto' }}>
+            <RouteMapLegend defaultCollapsed={!isDesktop} />
+          </Box>
+          <Box
+            component="section"
+            aria-label="Weather forecast timeline"
+            sx={{
+              pointerEvents: 'auto',
+              flex: '1 1 320px',
+              maxWidth: 560,
+              p: 1.5,
+              borderRadius: 2,
+              bgcolor: 'rgba(255, 255, 255, 0.92)',
+              boxShadow: 3,
+            }}
+          >
+            <ForecastSlider
+              value={forecastOffset}
+              onChange={setForecastOffset}
+              departureAt={departureAt}
+              loading={gridLoading}
+              error={gridError}
+            />
+          </Box>
+        </Box>
+        {selectedCheckpoint !== null && selectedCheckpointPayload !== null && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 16,
+              left: SIDEBAR_OFFSET,
+              maxWidth: 360,
+              pointerEvents: 'auto',
+            }}
+          >
+            <MapCheckpointDetail
+              checkpoint={selectedCheckpointPayload}
+              role={selectedCheckpoint.role}
+              onClose={() => setSelectedCheckpointId(null)}
+            />
           </Box>
         )}
-        <Typography id="route-map-caption" variant="caption" color="text.secondary">
-          Map markers summarize the route list that follows; every route, checkpoint, and
-          warning below stays available as text.
-        </Typography>
-        <RouteMapLegend />
-        <ForecastSlider
-          value={forecastOffset}
-          onChange={setForecastOffset}
-          departureAt={departureAt}
-          loading={gridLoading}
-          disabled={mapStatus !== 'ready'}
-          error={gridError}
-        />
-        <MapRouteSelection
-          entries={entries}
-          selectedRouteId={selectedRouteId}
-          onSelectRoute={onSelectRoute}
-        />
-        {selectedCheckpoint !== null && selectedCheckpointPayload !== null && (
-          <MapCheckpointDetail
-            checkpoint={selectedCheckpointPayload}
-            role={selectedCheckpoint.role}
-            onClose={() => setSelectedCheckpointId(null)}
-          />
-        )}
-      </Stack>
-    </section>
+      </Box>
+    </Box>
   );
 }
