@@ -143,6 +143,8 @@ def build_response(result: PlannedRoutePlan) -> dict[str, Any]:
     return {
         "id": result.plan_id,
         "status": "completed",
+        "routing_provider": result.routing_provider,
+        "mock_mode": result.mock_mode,
         "recommended_route_id": result.recommendation.recommended_route_id,
         "recommendation_reason": _reason_payload(result.recommendation.reason),
         "warnings": list(result.warnings),

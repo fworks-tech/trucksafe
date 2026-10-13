@@ -32,6 +32,8 @@ class RouteGeometry:
         """Require a usable polyline with finite positive totals."""
         if len(self.points) < 2:
             raise ValueError("route geometry needs at least origin and destination")
+        for point in self.points:
+            _validate_coordinate("route point", point)
         for name, value in (
             ("distance_miles", self.distance_miles),
             ("duration_seconds", self.duration_seconds),
@@ -81,6 +83,9 @@ class RoutePlanRequest:
 @runtime_checkable
 class RoutingProvider(Protocol):
     """Plans candidate routes between two coordinates."""
+
+    provider_name: str
+    """Short diagnostic name exposed in API responses (e.g. "mock", "osrm")."""
 
     def geocode(self, address: str) -> Coordinate:
         """Resolve a place name to WGS84 coordinates."""

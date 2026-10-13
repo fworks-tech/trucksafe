@@ -11,7 +11,7 @@ canonical units. Provider URLs, meters, and GeoJSON ordering stay here.
 
 import json
 from collections.abc import Callable, Mapping
-from math import isfinite
+from math import asin, cos, isfinite, radians, sin, sqrt
 from urllib import error as urlerror
 from urllib import parse as urlparse
 from urllib import request as urlrequest
@@ -87,8 +87,65 @@ def _first_us_point(payload: object) -> Coordinate | None:
     return None
 
 
+# Reported totals must roughly agree with the polyline they describe.
+# Bands are generous (real road circuity vs. great-circle math), but a
+# meters/miles mix-up (1609x) or a corrupt payload lands far outside.
+_POLYLINE_RATIO_MIN = 0.2
+_POLYLINE_RATIO_MAX = 5.0
+# No road vehicle averages above this; higher implies corrupt duration
+# (e.g. milliseconds reported as seconds).
+_MAX_PLAUSIBLE_SPEED_MPH = 500.0
+_EARTH_RADIUS_MILES = 3958.7613
+
+
+def _polyline_miles(points: tuple[Coordinate, ...]) -> float:
+    """Great-circle length of a polyline in miles."""
+    total = 0.0
+    for start, end in zip(points, points[1:], strict=False):
+        lat1, lon1 = radians(start.latitude), radians(start.longitude)
+        lat2, lon2 = radians(end.latitude), radians(end.longitude)
+        hav = (
+            sin((lat2 - lat1) / 2) ** 2
+            + cos(lat1) * cos(lat2) * sin((lon2 - lon1) / 2) ** 2
+        )
+        total += 2 * _EARTH_RADIUS_MILES * asin(sqrt(hav))
+    return total
+
+
+def _check_totals_against_polyline(
+    points: tuple[Coordinate, ...],
+    distance_miles: float,
+    duration_seconds: float,
+) -> None:
+    """Reject totals that disagree with the polyline they describe."""
+    polyline = _polyline_miles(points)
+    if polyline <= 0.0:
+        raise ValueError("route polyline has no length")
+    if not (
+        _POLYLINE_RATIO_MIN * polyline
+        <= distance_miles
+        <= _POLYLINE_RATIO_MAX * polyline
+    ):
+        raise ValueError(
+            f"reported distance {distance_miles!r} disagrees "
+            f"with polyline length {polyline!r}"
+        )
+    if duration_seconds <= 0.0 or not isfinite(duration_seconds):
+        raise ValueError(f"duration must be finite and positive: {duration_seconds!r}")
+    speed_mph = distance_miles / duration_seconds * 3600.0
+    if not isfinite(speed_mph) or speed_mph > _MAX_PLAUSIBLE_SPEED_MPH:
+        raise ValueError(f"implied speed {speed_mph!r} mph is not plausible")
+
+
 class OsrmRoutingProvider:
-    """RoutingProvider backed by OSRM (roads) and Photon (geocoding)."""
+    """RoutingProvider backed by OSRM (roads) and Photon (geocoding).
+
+    Uses the public OSRM demo server with the default ``driving`` profile:
+    road-following geometry, but a car profile with no truck-specific
+    restrictions (height, weight, hazmat). Plan accordingly.
+    """
+
+    provider_name = "osrm"
 
     def __init__(
         self,
@@ -180,21 +237,38 @@ class OsrmRoutingProvider:
 
     @staticmethod
     def _to_geometry(route: object) -> RouteGeometry:
-        """Normalize one OSRM route (GeoJSON lon/lat) to domain units."""
+        """Normalize one OSRM route (GeoJSON lon/lat) to domain units.
+
+        Rejects malformed shapes: non-list coordinates, fewer than two
+        points, non-finite or out-of-range values (which also catches
+        swapped [lat, lon] order for US routes, since e.g. -96.8 is not
+        a valid latitude), and reported totals that disagree with the
+        polyline itself (unit mix-ups, corrupt payloads).
+        """
         if not isinstance(route, dict):
             raise ValueError("not a route object")
         geometry = route["geometry"]
         raw = geometry["coordinates"]
-        points = tuple(
-            Coordinate(latitude=float(pair[1]), longitude=float(pair[0]))
-            for pair in raw
-        )
-        if len(points) < 2:
+        if not isinstance(raw, list) or len(raw) < 2:
             raise ValueError("route has too few points")
+        points: list[Coordinate] = []
+        for pair in raw:
+            if not isinstance(pair, (list, tuple)) or len(pair) < 2:
+                raise ValueError("route coordinate must be a [lon, lat] pair")
+            longitude = float(pair[0])
+            latitude = float(pair[1])
+            if not isfinite(latitude) or not isfinite(longitude):
+                raise ValueError("route coordinate must be finite")
+            if not -90.0 <= latitude <= 90.0 or not -180.0 <= longitude <= 180.0:
+                raise ValueError(
+                    f"route coordinate out of WGS84 range: [{pair[0]!r}, {pair[1]!r}]"
+                )
+            points.append(Coordinate(latitude=latitude, longitude=longitude))
         distance_miles = float(route["distance"]) / _METERS_PER_MILE
         duration_seconds = float(route["duration"])
+        _check_totals_against_polyline(tuple(points), distance_miles, duration_seconds)
         return RouteGeometry(
-            points=points,
+            points=tuple(points),
             distance_miles=distance_miles,
             duration_seconds=duration_seconds,
         )

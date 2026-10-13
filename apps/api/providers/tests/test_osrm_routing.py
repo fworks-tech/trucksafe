@@ -26,11 +26,17 @@ def make_request() -> RoutePlanRequest:
     )
 
 
-def route_payload(coordinates: list[list[float]]) -> dict:
+def route_payload(
+    coordinates: list[list[float]],
+    distance_meters: float = 1_510_000.0,
+    duration_seconds: float = 60_000.0,
+) -> dict:
+    """One OSRM route with realistic intercity totals (mock payloads must
+    also satisfy the adapter's polyline-vs-reported sanity check)."""
     return {
         "geometry": {"type": "LineString", "coordinates": coordinates},
-        "distance": 1000.0,
-        "duration": 3600.0,
+        "distance": distance_meters,
+        "duration": duration_seconds,
     }
 
 
@@ -112,8 +118,8 @@ def test_plan_routes_follows_road_geometry_in_order() -> None:
     # GeoJSON is [lon, lat]; internal points are (lat, lon) in order.
     assert first.points[0] == Coordinate(latitude=41.8, longitude=-87.6)
     assert first.points[-1] == Coordinate(latitude=29.7, longitude=-95.3)
-    assert first.distance_miles == pytest.approx(1000.0 / 1609.344)
-    assert first.duration_seconds == 3600.0
+    assert first.distance_miles == pytest.approx(1_510_000.0 / 1609.344)
+    assert first.duration_seconds == 60_000.0
 
 
 def test_plan_routes_pads_with_via_routes() -> None:
@@ -169,3 +175,80 @@ def test_transport_timeout_maps_to_transient_error() -> None:
     provider = OsrmRoutingProvider(transport=failing_transport)
     with pytest.raises(ProviderTransientError):
         provider.geocode("Chicago, IL")
+
+
+def test_provider_name_identifies_osrm() -> None:
+    assert OsrmRoutingProvider(transport=transport_for({})).provider_name == "osrm"
+
+
+def test_to_geometry_preserves_dense_road_geometry() -> None:
+    """A curvy road polyline keeps every coordinate in order."""
+    line = [
+        [-87.6298, 41.8781],
+        [-87.9, 41.7],
+        [-88.3, 41.5],
+        [-88.8, 41.2],
+        [-89.4, 40.9],
+        [-90.0, 40.5],
+        [-90.8, 40.0],
+        [-91.5, 39.4],
+        [-92.3, 38.8],
+        [-93.2, 38.0],
+        [-94.2, 37.2],
+        [-95.3, 36.4],
+        [-96.0, 35.5],
+        [-96.5, 34.5],
+        [-96.7, 33.6],
+        [-96.7970, 32.7767],
+    ]
+    geometry = OsrmRoutingProvider._to_geometry(
+        route_payload(line, distance_meters=1_560_000.0, duration_seconds=62_000.0)
+    )
+    assert len(geometry.points) == len(line)
+    assert [(p.longitude, p.latitude) for p in geometry.points] == [
+        (lon, lat) for lon, lat in line
+    ]
+    assert geometry.points[0] == _ORIGIN  # order preserved, not re-sorted
+    assert geometry.distance_miles == pytest.approx(1_560_000.0 / 1609.344)
+
+
+def test_to_geometry_rejects_out_of_range_coordinate() -> None:
+    line = [[-87.6, 41.8], [200.0, 41.9], [-95.3, 29.7]]
+    with pytest.raises(ValueError, match="WGS84"):
+        OsrmRoutingProvider._to_geometry(route_payload(line))
+
+
+def test_to_geometry_rejects_lat_first_coordinate_order() -> None:
+    """US longitudes are below -67: read as latitude they are invalid."""
+    line = [[41.8, -87.6], [40.0, -90.0], [29.7, -95.3]]
+    with pytest.raises(ValueError, match="WGS84"):
+        OsrmRoutingProvider._to_geometry(route_payload(line))
+
+
+def test_to_geometry_rejects_distance_mismatch() -> None:
+    """A 1 km total for a ~940-mile polyline is corrupt, not routable."""
+    line = [[-87.6, 41.8], [-90.0, 40.0], [-95.3, 29.7]]
+    with pytest.raises(ValueError, match="disagrees"):
+        OsrmRoutingProvider._to_geometry(route_payload(line, distance_meters=1000.0))
+
+
+def test_to_geometry_rejects_implausible_speed() -> None:
+    line = [[-87.6, 41.8], [-87.7, 41.75]]
+    with pytest.raises(ValueError, match="plausible"):
+        OsrmRoutingProvider._to_geometry(
+            route_payload(line, distance_meters=10_000.0, duration_seconds=1.0)
+        )
+
+
+def test_malformed_route_payload_yields_transient_error() -> None:
+    """Corrupt geometry is skipped; with no usable route the failure is
+    transient (retryable), never a silent straight line."""
+    body = json.dumps(
+        {
+            "code": "Ok",
+            "routes": [route_payload([[-87.6, 41.8], [200.0, 41.9]])],
+        }
+    ).encode()
+    provider = OsrmRoutingProvider(transport=transport_for({"route/v1": body}))
+    with pytest.raises(ProviderTransientError):
+        provider.plan_routes(make_request())

@@ -15,6 +15,7 @@ from providers.protocols import (
 )
 from risk.schemas import WeatherObservation
 from route_plans.services import (
+    MOCK_GEOMETRY_WARNING,
     Endpoint,
     PlannedRoutePlan,
     _collect_warnings,
@@ -157,6 +158,8 @@ def test_out_of_range_coordinates_are_rejected() -> None:
 class _MalformedRoutingProvider:
     """Simulates a provider whose own response validation failed."""
 
+    provider_name = "malformed"
+
     def geocode(self, address: str) -> Coordinate:
         """Delegate geocoding to the deterministic mock."""
         return MockRoutingProvider().geocode(address)
@@ -290,3 +293,23 @@ def test_weather_lookups_use_distinct_checkpoint_etas() -> None:
     assert len(set(expected)) == len(expected)
     assert weather.valid_times[: len(expected)] == expected
     assert all(valid_time.tzinfo is not None for valid_time in weather.valid_times)
+
+
+def test_service_marks_mock_provider_explicitly() -> None:
+    """Mock plans self-identify so no client mistakes them for roads."""
+    result = plan()
+    assert result.routing_provider == "mock"
+    assert result.mock_mode is True
+    assert MOCK_GEOMETRY_WARNING in result.warnings
+
+
+def test_service_marks_real_provider_without_mock_warning() -> None:
+    """A named (non-mock) provider plans without the mock warning."""
+
+    class RoadStub(MockRoutingProvider):
+        provider_name = "osrm"
+
+    result = plan(routing_provider=RoadStub())
+    assert result.routing_provider == "osrm"
+    assert result.mock_mode is False
+    assert MOCK_GEOMETRY_WARNING not in result.warnings
