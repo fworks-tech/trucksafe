@@ -34,26 +34,30 @@ async function fillAndSubmit(): Promise<void> {
 }
 
 describe('RoutePlanPage', () => {
-  it('submits the correct payload and renders exactly three routes', { timeout: 15000 }, async () => {
-    setScenario('success', 150);
-    renderWithProviders(<RoutePlanPage />);
-    await fillAndSubmit();
+  it(
+    'submits the correct payload and renders exactly three routes',
+    { timeout: 15000 },
+    async () => {
+      setScenario('success', 150);
+      renderWithProviders(<RoutePlanPage />);
+      await fillAndSubmit();
 
-    await screen.findByText(/creating your route plan/i);
-    expect(screen.getByRole('button', { name: /planning/i })).toBeDisabled();
+      await screen.findByText(/creating your route plan/i);
+      expect(screen.getByRole('button', { name: /planning/i })).toBeDisabled();
 
-    await screen.findByText('Route alternatives (3)');
-    expect(captured.headers['content-type']).toContain('application/json');
-    const body = captured.body as Record<string, unknown>;
-    expect(body['origin']).toEqual({ address: 'Chicago, IL' });
-    expect(body['destination']).toEqual({ address: 'Dallas, TX' });
-    expect(body['departure_at']).toMatch(/Z$/);
-    expect(body['load_weight_lb']).toBe(20000);
-    expect(body['checkpoint_interval_miles']).toBe(25);
-    expect(captured.headers['x-request-id']).toMatch(/^[A-Za-z0-9_-]{1,128}$/);
-    // The request id is available for diagnostics on success too.
-    expect(screen.getByText(/Request ID:/)).toBeInTheDocument();
-  });
+      await screen.findByText('Route alternatives (3)');
+      expect(captured.headers['content-type']).toContain('application/json');
+      const body = captured.body as Record<string, unknown>;
+      expect(body['origin']).toEqual({ address: 'Chicago, IL' });
+      expect(body['destination']).toEqual({ address: 'Dallas, TX' });
+      expect(body['departure_at']).toMatch(/Z$/);
+      expect(body['load_weight_lb']).toBe(20000);
+      expect(body['checkpoint_interval_miles']).toBe(25);
+      expect(captured.headers['x-request-id']).toMatch(/^[A-Za-z0-9_-]{1,128}$/);
+      // The request id is available for diagnostics on success too.
+      expect(screen.getByText(/Request ID:/)).toBeInTheDocument();
+    },
+  );
 
   it('identifies the recommended route with the backend reason', async () => {
     setScenario('success');

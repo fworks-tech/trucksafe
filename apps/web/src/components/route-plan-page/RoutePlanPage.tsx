@@ -26,7 +26,9 @@ import { WarningList } from '../route-card/WarningList';
 
 // Lazy so the map bundle only loads once a result exists; the initial
 // form route stays lightweight.
-const mapChunk = (): Promise<{ default: typeof import('../route-map/RouteMapSection').RouteMapSection }> =>
+const mapChunk = (): Promise<{
+  default: typeof import('../route-map/RouteMapSection').RouteMapSection;
+}> =>
   import('../route-map/RouteMapSection').then((module) => ({
     default: module.RouteMapSection,
   }));

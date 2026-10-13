@@ -32,7 +32,10 @@ describe('RoutePlanForm city autocomplete', () => {
     expect(screen.getByLabelText(/^origin/i)).toHaveValue('Phoenix, AZ');
     await user.clear(screen.getByLabelText(/^destination/i));
     await user.type(screen.getByLabelText(/^destination/i), 'Miami, FL');
-    await user.type(screen.getByLabelText(/departure date and time/i), '2026-10-12T14:30');
+    await user.type(
+      screen.getByLabelText(/departure date and time/i),
+      '2026-10-12T14:30',
+    );
     await user.type(screen.getByLabelText(/load weight/i), '20000');
     await user.click(screen.getByRole('button', { name: /plan route/i }));
     expect(seen).toEqual(['Phoenix, AZ|Miami, FL']);
