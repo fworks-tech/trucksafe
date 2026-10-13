@@ -56,8 +56,12 @@ export function RouteSidebar({ header, children }: RouteSidebarProps): React.JSX
           position: 'absolute',
           top: 16,
           left: 16,
-          bottom: 16,
           width: 384,
+          // Hug the content instead of stretching full height: short
+          // states (e.g. the plan form) leave map visible below the panel
+          // instead of an empty box. Tall results still cap at the
+          // viewport and scroll inside.
+          maxHeight: 'calc(100dvh - 32px)',
           overflowY: 'auto',
           overscrollBehavior: 'contain',
           p: 2,
