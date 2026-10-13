@@ -1,4 +1,5 @@
-import { ExpandMore, TrendingDown } from '@mui/icons-material';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import TrendingDown from '@mui/icons-material/TrendingDown';
 import { Box, IconButton, Paper, Stack, Typography } from '@mui/material';
 import { useState } from 'react';
 

@@ -1,5 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Flag, MyLocation, Scale, Schedule } from '@mui/icons-material';
+import Flag from '@mui/icons-material/Flag';
+import MyLocation from '@mui/icons-material/MyLocation';
+import Scale from '@mui/icons-material/Scale';
+import Schedule from '@mui/icons-material/Schedule';
 import {
   Autocomplete,
   Box,

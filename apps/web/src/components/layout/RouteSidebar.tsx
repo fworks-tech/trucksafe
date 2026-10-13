@@ -1,4 +1,6 @@
-import { ExpandLess, ExpandMore, UnfoldMore } from '@mui/icons-material';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import UnfoldMore from '@mui/icons-material/UnfoldMore';
 import { Box, IconButton, useMediaQuery } from '@mui/material';
 import { useState, type ReactNode } from 'react';
 
