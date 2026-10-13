@@ -44,6 +44,7 @@ export function ForecastSection({
   return (
     <Accordion
       disableGutters
+      data-tour="forecast-section"
       expanded={expanded}
       onChange={(_event, isExpanded) => setExpanded(isExpanded)}
       sx={{ borderRadius: 2 }}

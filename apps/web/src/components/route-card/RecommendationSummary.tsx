@@ -54,6 +54,7 @@ export function RecommendationSummary({
 
   return (
     <Card
+      data-tour="recommended-route"
       sx={{
         border: `2px solid ${token.border}`,
         backgroundColor: token.background,

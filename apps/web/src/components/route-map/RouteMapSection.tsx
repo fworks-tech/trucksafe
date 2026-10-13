@@ -175,6 +175,7 @@ export function RouteMapSection({
     <Box
       component="section"
       aria-label="Route map"
+      data-tour="route-map"
       sx={{ position: 'absolute', inset: 0 }}
     >
       <Typography variant="h2" component="h2" sx={{ position: 'absolute', left: -9999 }}>

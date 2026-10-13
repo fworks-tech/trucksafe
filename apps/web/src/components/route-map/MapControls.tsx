@@ -81,7 +81,7 @@ export function MapControls({
         }
         placement="left"
       >
-        <span>
+        <span data-tour="heatmap-toggle">
           <IconButton
             aria-label="Toggle weather heatmap"
             aria-pressed={heatmapVisible}

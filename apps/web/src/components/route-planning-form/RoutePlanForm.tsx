@@ -115,6 +115,7 @@ export function RoutePlanForm({
               <TextField
                 {...params}
                 id={name}
+                data-tour={name === 'origin' ? 'origin-input' : 'destination-input'}
                 label={label}
                 placeholder={placeholder}
                 autoComplete="off"
@@ -187,6 +188,7 @@ export function RoutePlanForm({
         )}
         <TextField
           id="departure"
+          data-tour="departure-input"
           label="Departure date and time"
           type="datetime-local"
           disabled={isPending}
@@ -204,6 +206,7 @@ export function RoutePlanForm({
         />
         <TextField
           id="loadWeight"
+          data-tour="load-weight-input"
           label="Load weight (lb)"
           type="number"
           disabled={isPending}
@@ -221,6 +224,7 @@ export function RoutePlanForm({
         />
         <FormControl
           fullWidth
+          data-tour="checkpoint-interval"
           disabled={isPending}
           error={errors.checkpointInterval !== undefined}
         >
@@ -248,7 +252,12 @@ export function RoutePlanForm({
           )}
         </FormControl>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-          <Button type="submit" variant="contained" disabled={isPending}>
+          <Button
+            type="submit"
+            variant="contained"
+            data-tour="generate-route"
+            disabled={isPending}
+          >
             {isPending ? 'Planning…' : 'Plan route'}
           </Button>
           {isPending && (
