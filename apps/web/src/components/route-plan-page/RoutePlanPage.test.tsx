@@ -233,9 +233,7 @@ describe('RoutePlanPage map integration', () => {
       renderWithProviders(<RoutePlanPage />);
       await fillAndSubmit();
       await screen.findByText('Route alternatives (3)');
-      const banner = screen
-        .getByText(/Demonstration geometry/)
-        .closest('[role="alert"]');
+      const banner = screen.getByText(/Demonstration geometry/).closest('[role="alert"]');
       expect(banner).not.toBeNull();
       await user.click(
         within(banner as HTMLElement).getByRole('button', { name: 'Close' }),

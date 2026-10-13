@@ -31,11 +31,17 @@ export function RequestStatus({
       )}
       {state === 'error' && error !== null && <ErrorState error={error} />}
       {state === 'success' && !successDismissed && (
-        <Alert severity="success" onClose={() => setSuccessDismissed(true)} sx={{ width: '100%' }}>
+        <Alert
+          severity="success"
+          onClose={() => setSuccessDismissed(true)}
+          sx={{ width: '100%' }}
+        >
           Route plan ready with {routeCount} alternative
           {routeCount === 1 ? '' : 's'}.
         </Alert>
       )}
     </Box>
-  ) : <></>;
+  ) : (
+    <></>
+  );
 }

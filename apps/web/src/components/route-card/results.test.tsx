@@ -154,9 +154,7 @@ describe('RecommendationSummary', () => {
     const user = userEvent.setup();
     const plan = makeRoutePlan();
     renderWithProviders(<RecommendationSummary response={plan} requestId="req-1" />);
-    await user.click(
-      screen.getByRole('button', { name: 'Dismiss recommendation' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Dismiss recommendation' }));
     expect(screen.queryByText('Recommended: Route 1')).not.toBeInTheDocument();
   });
 

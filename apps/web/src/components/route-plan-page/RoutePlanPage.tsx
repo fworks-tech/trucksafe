@@ -1,12 +1,4 @@
-import {
-  Alert,
-  Box,
-  Button,
-  Stack,
-  Tab,
-  Tabs,
-  Typography,
-} from '@mui/material';
+import { Alert, Box, Button, Stack, Tab, Tabs, Typography } from '@mui/material';
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useRoutePlanMutation } from '../../features/route-planning/hooks/useRoutePlan';
@@ -165,15 +157,15 @@ export function RoutePlanPage(): React.JSX.Element {
         header={
           <Box sx={{ mt: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="h1" component="h1" sx={{ m: 0 }}>
-              <Box
-                component="img"
-                src="/logo-sidebar.png"
-                alt="TruckSafe"
-                sx={{ display: 'block', height: 48 }}
-              />
-            </Typography>
-          </Box>
+              <Typography variant="h1" component="h1" sx={{ m: 0 }}>
+                <Box
+                  component="img"
+                  src="/logo-sidebar.png"
+                  alt="TruckSafe"
+                  sx={{ display: 'block', height: 48 }}
+                />
+              </Typography>
+            </Box>
             <Tabs
               value={activeTab}
               onChange={(_event: React.SyntheticEvent, value: string) =>
@@ -201,16 +193,18 @@ export function RoutePlanPage(): React.JSX.Element {
             gap: 1,
             mb: 1,
           }}
-        >
-          
-        </Box>
+        ></Box>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Plan a truck route and compare weather-risk alternatives. Forecast weather is
           simulated, not live.
         </Typography>
 
         {response !== null && response.mock_mode && !mockNoticeDismissed && (
-          <Alert severity="warning" onClose={() => setMockNoticeDismissed(true)} sx={{ mb: 2 }}>
+          <Alert
+            severity="warning"
+            onClose={() => setMockNoticeDismissed(true)}
+            sx={{ mb: 2 }}
+          >
             Demonstration geometry — this plan uses the mock routing provider, not live
             road data. Routes are straight corridors, and load rules still apply in
             pounds.
