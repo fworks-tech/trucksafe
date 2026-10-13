@@ -70,15 +70,15 @@ A checkpoint display must include:
 
 ## Acceptance Criteria
 
-- [ ] All available routes are visible.
-- [ ] The recommended route is visually distinct.
-- [ ] Checkpoints are displayed at the configured interval.
-- [ ] Checkpoint risk colors match the risk level.
-- [ ] Clicking a checkpoint shows its data.
-- [ ] Segment colors match the backend `risk_segments` risk levels.
-- [ ] Segment coloring degrades to route-level coloring for a route with
+- [x] All available routes are visible.
+- [x] The recommended route is visually distinct.
+- [x] Checkpoints are displayed at the configured interval.
+- [x] Checkpoint risk colors match the risk level.
+- [x] Clicking a checkpoint shows its data.
+- [x] Segment colors match the backend `risk_segments` risk levels.
+- [x] Segment coloring degrades to route-level coloring for a route with
       mismatched intervals.
-- [ ] Unavailable segment risk renders gray, not Low.
-- [ ] Route summaries match the backend response.
-- [ ] The map remains usable while changing the selected route.
-- [ ] The main map interaction is covered by an end-to-end test.
+- [x] Unavailable segment risk renders gray, not Low.
+- [x] Route summaries match the backend response.
+- [x] The map remains usable while changing the selected route.
+- [x] The main map interaction is covered by an end-to-end test.
