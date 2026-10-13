@@ -2,7 +2,6 @@ import {
   Alert,
   Box,
   Button,
-  CircularProgress,
   Stack,
   Tab,
   Tabs,
@@ -162,6 +161,16 @@ export function RoutePlanPage(): React.JSX.Element {
       <RouteSidebar
         header={
           <Box sx={{ mt: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="h1" component="h1" sx={{ m: 0 }}>
+              <Box
+                component="img"
+                src="/logo-sidebar.png"
+                alt="TruckSafe"
+                sx={{ display: 'block', height: 48 }}
+              />
+            </Typography>
+          </Box>
             <Tabs
               value={activeTab}
               onChange={(_event: React.SyntheticEvent, value: string) =>
@@ -190,17 +199,7 @@ export function RoutePlanPage(): React.JSX.Element {
             mb: 1,
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="h1" component="h1" sx={{ m: 0 }}>
-              <Box
-                component="img"
-                src="/logo-sidebar.png"
-                alt="TruckSafe"
-                sx={{ display: 'block', height: 48 }}
-              />
-            </Typography>
-          </Box>
-          {mutation.isPending && <CircularProgress size={20} aria-hidden="true" />}
+          
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Plan a truck route and compare weather-risk alternatives. Forecast weather is
@@ -215,11 +214,15 @@ export function RoutePlanPage(): React.JSX.Element {
           </Alert>
         )}
 
-        <RequestStatus
-          state={state}
-          error={error}
-          routeCount={response?.routes.length ?? 0}
-        />
+        {
+          response !== null && state !== 'idle' && (
+            <RequestStatus
+              state={state}
+              error={error}
+              routeCount={response.routes.length}
+            />
+          )
+        }
 
         <Box
           role="tabpanel"
