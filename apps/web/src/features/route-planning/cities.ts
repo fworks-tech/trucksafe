@@ -120,14 +120,17 @@ export const DEFAULT_ORIGIN_CITY = 'Chicago, IL';
 /**
  * Resolve a city name to coordinates (case-insensitive). Returns null
  * for unknown free text so callers keep the last known viewport.
+ *
+ * Canonical source: `apps/api/providers/mock_routing.py::_KNOWN_ADDRESSES`.
+ * Keep the tables identical when either changes.
  */
+const COORDINATES_BY_LOWER_NAME: ReadonlyMap<string, CityCoordinates> = new Map(
+  Object.entries(CITY_COORDINATES).map(([city, point]) => [
+    city.toLowerCase(),
+    { latitude: point.latitude, longitude: point.longitude },
+  ]),
+);
+
 export function lookupCityCoordinates(name: string): CityCoordinates | null {
-  const key = Object.keys(CITY_COORDINATES).find(
-    (city) => city.toLowerCase() === name.trim().toLowerCase(),
-  );
-  if (key === undefined) return null;
-  const point = CITY_COORDINATES[key];
-  return point === undefined
-    ? null
-    : { latitude: point.latitude, longitude: point.longitude };
+  return COORDINATES_BY_LOWER_NAME.get(name.trim().toLowerCase()) ?? null;
 }

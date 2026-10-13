@@ -146,6 +146,7 @@ export function RoutePlanForm({
                 variant="outlined"
                 color="primary"
                 clickable
+                disabled={isPending}
                 onClick={() => {
                   setValue('origin', example.origin);
                   setValue('destination', example.destination);

@@ -60,4 +60,13 @@ describe('RoutePlanForm city autocomplete', () => {
     expect(departure).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
     expect(screen.getByLabelText(/^destination/i)).toHaveValue('');
   });
+
+  it('disables quick examples while a plan is pending', () => {
+    renderWithProviders(
+      <RoutePlanForm onSubmit={() => {}} isPending onCancel={() => {}} />,
+    );
+    expect(
+      screen.getByRole('button', { name: /phoenix, az to denver, co/i }),
+    ).toHaveAttribute('aria-disabled', 'true');
+  });
 });

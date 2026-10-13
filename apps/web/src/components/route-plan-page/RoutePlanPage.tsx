@@ -8,7 +8,7 @@ import {
   Tabs,
   Typography,
 } from '@mui/material';
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useRoutePlanMutation } from '../../features/route-planning/hooks/useRoutePlan';
 import {
@@ -53,7 +53,10 @@ export function RoutePlanPage(): React.JSX.Element {
   // Origin city driving the pre-plan background map. Unknown free text
   // keeps the previous viewport (lookup returns null, center is unchanged).
   const [originCity, setOriginCity] = useState<string>(DEFAULT_ORIGIN_CITY);
-  const focusCenter = lookupCityCoordinates(originCity);
+  // Memoized by city name so unrelated re-renders keep a stable
+  // reference and never refire the map-focus effect (which would snap
+  // back a manually panned viewport).
+  const focusCenter = useMemo(() => lookupCityCoordinates(originCity), [originCity]);
 
   useEffect(() => {
     return (): void => {
@@ -146,9 +149,7 @@ export function RoutePlanPage(): React.JSX.Element {
             />
           </Suspense>
         ) : (
-          <Suspense fallback={null}>
-            <OriginFocusMap center={focusCenter} cityName={originCity} />
-          </Suspense>
+          <OriginFocusMap center={focusCenter} cityName={originCity} />
         )}
       </Box>
 
