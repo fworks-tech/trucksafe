@@ -27,6 +27,29 @@ export const USER_MESSAGES: Record<ApiErrorCategory, string> = {
   unexpected: 'We could not create the route plan. Please try again.',
 };
 
+/**
+ * Weather-grid failures must never surface route-plan wording: the plan
+ * can succeed while the forecast fails, and the two flows are independent.
+ */
+export const WEATHER_USER_MESSAGES: Record<ApiErrorCategory, string> = {
+  validation: 'The forecast request was rejected. Try a different hour.',
+  domain: 'The forecast request was rejected. Try a different hour.',
+  provider: 'The weather provider failed for this forecast.',
+  unavailable: 'The weather service is temporarily unavailable.',
+  network: 'We could not reach the weather service. Check your connection.',
+  malformed: 'The weather forecast data could not be read.',
+  aborted: 'The forecast request was cancelled.',
+  unexpected: 'The weather forecast could not be loaded.',
+};
+
+/** User-safe message for a weather-grid failure, whatever error type arrived. */
+export function weatherUserMessage(error: unknown): string {
+  if (error instanceof RoutePlanApiError) {
+    return WEATHER_USER_MESSAGES[error.category];
+  }
+  return WEATHER_USER_MESSAGES.unexpected;
+}
+
 export interface ApiErrorDetails {
   category: ApiErrorCategory;
   /** HTTP status when the request reached the backend. */

@@ -10,6 +10,8 @@ import { RiskBadge } from './RiskBadge';
 
 interface RouteCardProps {
   route: RoutePayload;
+  /** Human-facing name, e.g. "Route 2"; the backend id stays in data. */
+  label: string;
   /** True only when the backend marks this eligible route recommended. */
   recommended: boolean;
   /** True when this route is the current map/list selection. */
@@ -21,6 +23,7 @@ interface RouteCardProps {
 /** One route alternative. Ineligible routes are never shown as recommended. */
 export function RouteCard({
   route,
+  label,
   recommended,
   selected = false,
   onSelect,
@@ -31,7 +34,8 @@ export function RouteCard({
 
   return (
     <Card
-      aria-label={`Route ${route.id}${showRecommended ? ', recommended' : ''}${route.is_eligible ? '' : ', not eligible'}${selected ? ', selected' : ''}`}
+      data-route-id={route.id}
+      aria-label={`${label}${showRecommended ? ', recommended' : ''}${route.is_eligible ? '' : ', not eligible'}${selected ? ', selected' : ''}`}
       sx={
         showRecommended || selected
           ? {
@@ -45,7 +49,7 @@ export function RouteCard({
         <Stack spacing={1.5}>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             <Typography variant="h3" component="h3">
-              {route.id}
+              {label}
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>

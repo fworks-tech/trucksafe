@@ -62,7 +62,9 @@ Test scenarios include:
 - Successful geocoding.
 - Successful route generation.
 - Successful weather forecast.
-- Provider timeout (deferred: no timeouts yet).
+- Provider timeout (covered: the OSRM adapter maps transport timeouts
+  to transient errors with an 8-second request timeout; mock providers
+  perform no I/O).
 - Provider rate limiting (deferred).
 - Malformed provider response.
 - Missing weather data.

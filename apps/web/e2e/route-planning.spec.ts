@@ -33,10 +33,11 @@ test('creates a route plan and displays three alternatives with a recommendation
   expect([200, 201]).toContain(finished.status());
 
   await expect(page.getByText('Route alternatives (3)')).toBeVisible();
-  await expect(page.getByText(/Recommended: route-/)).toBeVisible();
-  await expect(page.getByText('Recommended', { exact: true })).toHaveCount(1);
-  for (const id of ['route-1', 'route-2', 'route-3']) {
-    await expect(page.getByRole('heading', { name: id, exact: true })).toBeVisible();
+  await expect(page.getByText(/Recommended: Route /)).toBeVisible();
+  const cards = page.locator('section[aria-label="Route alternatives"]');
+  await expect(cards.getByText('Recommended', { exact: true })).toHaveCount(1);
+  for (const label of ['Route 1', 'Route 2', 'Route 3']) {
+    await expect(cards.getByRole('heading', { name: label, exact: true })).toBeVisible();
   }
 });
 
@@ -68,7 +69,7 @@ test('starts a new plan without showing stale results', async ({ page }) => {
 
   await page.getByRole('button', { name: /plan route/i }).click();
   await expect(page.getByText('Route alternatives (3)')).toBeVisible();
-  await expect(page.getByText(/Recommended: route-/)).toHaveCount(1);
+  await expect(page.getByText(/Recommended: Route /)).toHaveCount(1);
 });
 
 test('has no critical accessibility violations on form and result states', async ({

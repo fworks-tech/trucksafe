@@ -1,6 +1,7 @@
 import { Alert, Box, Card, CardContent, Chip, Typography } from '@mui/material';
 
 import { statusTokens } from '../../app/theme';
+import { routeLabelsById } from '../../features/route-planning/labels';
 import type { RoutePlanResponse } from '../../features/route-planning/types';
 import { RequestIdNotice } from './RequestIdNotice';
 
@@ -16,6 +17,7 @@ export function RecommendationSummary({
 }: RecommendationSummaryProps): React.JSX.Element {
   const { recommended_route_id: recommendedId, recommendation_reason: reason } = response;
   const token = statusTokens.recommended;
+  const labels = routeLabelsById(response.routes);
 
   if (recommendedId === null) {
     return (
@@ -38,7 +40,7 @@ export function RecommendationSummary({
       <CardContent>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
           <Chip
-            label={`Recommended: ${recommendedId}`}
+            label={`Recommended: ${recommendedId !== null ? (labels[recommendedId] ?? recommendedId) : ''}`}
             sx={{
               backgroundColor: token.background,
               color: token.text,

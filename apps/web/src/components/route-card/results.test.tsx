@@ -20,11 +20,12 @@ describe('RouteCard', () => {
     renderWithProviders(
       <RouteCard
         route={makeRoute('route-1', { recommended: true })}
+        label="Route 1"
         recommended={true}
       />,
     );
     expect(screen.getByText('Recommended')).toBeInTheDocument();
-    expect(screen.getByText('route-1')).toBeInTheDocument();
+    expect(screen.getByText('Route 1')).toBeInTheDocument();
     expect(screen.getByText('Eligible')).toBeInTheDocument();
   });
 
@@ -32,6 +33,7 @@ describe('RouteCard', () => {
     renderWithProviders(
       <RouteCard
         route={makeRoute('route-9', { eligible: false, recommended: true })}
+        label="Route 9"
         recommended={true}
       />,
     );
@@ -53,8 +55,25 @@ describe('RouteComparison', () => {
     );
     expect(screen.getByText('Route alternatives (3)')).toBeInTheDocument();
     for (const route of plan.routes) {
-      expect(screen.getByText(route.id)).toBeInTheDocument();
+      expect(document.querySelector(`[data-route-id="${route.id}"]`)).not.toBeNull();
     }
+  });
+
+  it('navigates the carousel with labelled arrows and dots', async () => {
+    const user = userEvent.setup();
+    const plan = makeRoutePlan();
+    renderWithProviders(
+      <RouteComparison
+        routes={plan.routes}
+        recommendedRouteId={plan.recommended_route_id}
+        selectedRouteId={plan.routes[0]!.id}
+        onSelectRoute={() => {}}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Previous route' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Next route' }));
+    expect(screen.getByRole('button', { name: 'Previous route' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Show Route 2' })).toBeInTheDocument();
   });
 
   it('marks the selected route and syncs selection through cards', async () => {
@@ -94,7 +113,7 @@ describe('RecommendationSummary', () => {
   it('shows the recommended route with the backend reason', () => {
     const plan = makeRoutePlan();
     renderWithProviders(<RecommendationSummary response={plan} requestId="req-1" />);
-    expect(screen.getByText('Recommended: route-1')).toBeInTheDocument();
+    expect(screen.getByText('Recommended: Route 1')).toBeInTheDocument();
     expect(screen.getByText(/deterministic route ranking criteria/)).toBeInTheDocument();
     expect(screen.getByText(/severe_miles/)).toBeInTheDocument();
   });

@@ -1,21 +1,34 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Flag, MyLocation, Scale, Schedule } from '@mui/icons-material';
 import {
+  Autocomplete,
+  Box,
   Button,
   FormControl,
   FormHelperText,
+  InputAdornment,
   InputLabel,
   MenuItem,
   Select,
   Stack,
   TextField,
+  Typography,
 } from '@mui/material';
 import { Controller, useForm } from 'react-hook-form';
+import { useState } from 'react';
 
+import { US_CITIES } from '../../features/route-planning/cities';
 import {
   routePlanFormSchema,
   type RoutePlanFormValues,
 } from '../../features/route-planning/schemas';
 import { CHECKPOINT_INTERVALS } from '../../features/route-planning/types';
+
+/** Accessible quick examples: they only prefill addresses, never submit. */
+const QUICK_EXAMPLES = [
+  { origin: 'Chicago, IL', destination: 'Dallas, TX' },
+  { origin: 'Phoenix, AZ', destination: 'Denver, CO' },
+] as const;
 
 interface RoutePlanFormProps {
   onSubmit: (values: RoutePlanFormValues) => void;
@@ -33,6 +46,7 @@ export function RoutePlanForm({
     register,
     control,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<RoutePlanFormValues>({
     resolver: zodResolver(routePlanFormSchema),
@@ -43,30 +57,107 @@ export function RoutePlanForm({
       checkpointInterval: 25,
     },
   });
+  // Mirror of the typed text: RHF only commits freeSolo text on blur or
+  // option pick, but keystrokes must stay visible while typing.
+  const [originText, setOriginText] = useState('');
+  const [destinationText, setDestinationText] = useState('');
+
+  /** City input with suggestions; free text stays allowed for real geocoding. */
+  function cityField(
+    name: 'origin' | 'destination',
+    label: string,
+    placeholder: string,
+    icon: React.ReactNode,
+    text: string,
+    setText: (value: string) => void,
+  ): React.JSX.Element {
+    const fieldError = errors[name]?.message;
+    return (
+      <Controller
+        name={name}
+        control={control}
+        render={({ field }) => (
+          <Autocomplete
+            freeSolo
+            autoHighlight
+            options={US_CITIES}
+            inputValue={text}
+            onInputChange={(_event, value) => {
+              setText(value);
+              field.onChange(value);
+            }}
+            onChange={(_event, value) => {
+              const next = typeof value === 'string' ? value : '';
+              setText(next);
+              field.onChange(next);
+            }}
+            onBlur={field.onBlur}
+            disabled={isPending}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                id={name}
+                label={label}
+                placeholder={placeholder}
+                autoComplete="off"
+                error={fieldError !== undefined}
+                helperText={fieldError}
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <InputAdornment position="start">{icon}</InputAdornment>
+                  ),
+                }}
+              />
+            )}
+          />
+        )}
+      />
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate aria-label="Route plan form">
       <Stack spacing={2}>
-        <TextField
-          id="origin"
-          label="Origin"
-          placeholder="Chicago, IL"
-          autoComplete="off"
-          disabled={isPending}
-          error={errors.origin !== undefined}
-          helperText={errors.origin?.message}
-          {...register('origin')}
-        />
-        <TextField
-          id="destination"
-          label="Destination"
-          placeholder="Dallas, TX"
-          autoComplete="off"
-          disabled={isPending}
-          error={errors.destination !== undefined}
-          helperText={errors.destination?.message}
-          {...register('destination')}
-        />
+        <Box role="group" aria-label="Quick examples">
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+            Quick examples
+          </Typography>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', pt: 0.5 }}>
+            {QUICK_EXAMPLES.map((example) => (
+              <Button
+                key={example.origin}
+                type="button"
+                size="small"
+                variant="outlined"
+                onClick={() => {
+                  setValue('origin', example.origin);
+                  setValue('destination', example.destination);
+                  setOriginText(example.origin);
+                  setDestinationText(example.destination);
+                }}
+              >
+                {`${example.origin} to ${example.destination}`}
+              </Button>
+            ))}
+          </Stack>
+        </Box>
+        {cityField(
+          'origin',
+          'Origin',
+          'Chicago, IL',
+          <MyLocation fontSize="small" />,
+          originText,
+          setOriginText,
+        )}
+        {cityField(
+          'destination',
+          'Destination',
+          'Dallas, TX',
+          <Flag fontSize="small" />,
+          destinationText,
+          setDestinationText,
+        )}
         <TextField
           id="departure"
           label="Departure date and time"
@@ -75,6 +166,13 @@ export function RoutePlanForm({
           error={errors.departure !== undefined}
           helperText={errors.departure?.message ?? 'Interpreted in your local timezone.'}
           slotProps={{ inputLabel: { shrink: true } }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Schedule fontSize="small" />
+              </InputAdornment>
+            ),
+          }}
           {...register('departure')}
         />
         <TextField
@@ -85,6 +183,13 @@ export function RoutePlanForm({
           error={errors.loadWeight !== undefined}
           helperText={errors.loadWeight?.message}
           slotProps={{ htmlInput: { min: 0, step: 'any' } }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Scale fontSize="small" />
+              </InputAdornment>
+            ),
+          }}
           {...register('loadWeight', { valueAsNumber: true })}
         />
         <FormControl

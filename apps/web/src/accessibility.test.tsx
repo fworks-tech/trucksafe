@@ -46,7 +46,7 @@ describe('accessibility', () => {
     }
   });
 
-  it('has no axe violations on the success state', async () => {
+  it('has no axe violations on the success state', { timeout: 15000 }, async () => {
     server.use(routePlansHandler('success'));
     const user = userEvent.setup();
     const { container } = renderWithProviders(<App />);

@@ -356,8 +356,10 @@ offset from departure.
 
 ### Behavior
 
-- The grid samples weather at each route checkpoint using the
-  checkpoint's ETA plus the forecast offset.
+- The grid samples weather at each route checkpoint position for the
+  forecast hour `departure_at + offset_hours` (departure truncated to the
+  hour). Checkpoint ETAs drive the plan-time sampling on `POST
+  /route-plans`; the grid is the offset-based forecast view on top.
 - Cells with unavailable weather have `risk_level: null`, `risk_score: null`,
   empty `risk_reasons`, and `weather: null`.
 - The grid is deterministic for the same inputs.

@@ -1,5 +1,10 @@
-import { Box, Slider, Typography } from '@mui/material';
-import { format, parseISO } from 'date-fns';
+import { Alert, Box, Slider, Typography } from '@mui/material';
+
+import {
+  computeForecastTime,
+  forecastOffsetLabel,
+  formatForecastTime,
+} from '../../lib/forecast';
 
 interface ForecastSliderProps {
   /** Current forecast offset in hours (0-48). */
@@ -20,27 +25,6 @@ const MIN_HOURS = 0;
 const MAX_HOURS = 48;
 const STEP_HOURS = 1;
 
-/** Format a UTC timestamp as a local time string with timezone label. */
-function formatForecastTime(utcString: string): string {
-  try {
-    const date = parseISO(utcString.replace('Z', '+00:00'));
-    return format(date, 'MMM d, yyyy HH:mm') + ' UTC';
-  } catch {
-    return utcString;
-  }
-}
-
-/** Compute the absolute forecast timestamp from departure + offset. */
-function computeForecastTime(departureAt: string, offsetHours: number): string {
-  try {
-    const departure = parseISO(departureAt.replace('Z', '+00:00'));
-    const forecast = new Date(departure.getTime() + offsetHours * 3600 * 1000);
-    return forecast.toISOString().replace(/\.\d{3}Z$/, 'Z');
-  } catch {
-    return departureAt;
-  }
-}
-
 export function ForecastSlider({
   value,
   onChange,
@@ -58,11 +42,7 @@ export function ForecastSlider({
   }));
 
   return (
-    <Box
-      component="section"
-      aria-label="Weather forecast slider"
-      sx={{ width: '100%', mt: 2, mb: 1 }}
-    >
+    <Box component="section" aria-label="Weather forecast slider" sx={{ width: '100%' }}>
       <Box
         sx={{
           display: 'flex',
@@ -75,7 +55,7 @@ export function ForecastSlider({
           Forecast offset
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          {value === 0 ? 'Departure time' : `+${value}h`}
+          {forecastOffsetLabel(value)}
         </Typography>
       </Box>
 
@@ -86,7 +66,6 @@ export function ForecastSlider({
       >
         {formattedTime}
         {loading && ' — Loading…'}
-        {error && ` — Error: ${error}`}
       </Typography>
 
       <Slider
@@ -107,9 +86,9 @@ export function ForecastSlider({
       />
 
       {error && (
-        <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
-          Failed to load forecast: {error}
-        </Typography>
+        <Alert severity="warning" role="status" sx={{ mt: 1 }}>
+          Weather forecast unavailable: {error} Routes below are still current.
+        </Alert>
       )}
     </Box>
   );

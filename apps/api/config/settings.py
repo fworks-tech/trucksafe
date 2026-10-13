@@ -80,6 +80,26 @@ SECRET_KEY: str = _resolve_secret_key(
 
 ALLOWED_HOSTS: list[str] = _parse_allowed_hosts(os.environ.get("ALLOWED_HOSTS"))
 
+# Provider selection. ``osrm`` resolves to the road-following OSRM/Photon
+# adapter (no credentials); a dotted path selects any custom adapter;
+# unset keeps the deterministic mocks. The factory instantiates whatever
+# is configured, so no view or service code changes with the provider.
+_PROVIDER_ALIASES = {"osrm": "providers.osrm_routing.OsrmRoutingProvider"}
+
+
+def _resolve_provider(raw: str | None) -> str | None:
+    if raw is None or not raw.strip():
+        return None
+    return _PROVIDER_ALIASES.get(raw.strip().lower(), raw.strip())
+
+
+TRUCKSAFE_ROUTING_PROVIDER: str | None = _resolve_provider(
+    os.environ.get("TRUCKSAFE_ROUTING_PROVIDER")
+)
+TRUCKSAFE_WEATHER_PROVIDER: str | None = _resolve_provider(
+    os.environ.get("TRUCKSAFE_WEATHER_PROVIDER")
+)
+
 
 INSTALLED_APPS = [
     # Django applications

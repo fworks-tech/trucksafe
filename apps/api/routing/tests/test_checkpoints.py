@@ -413,3 +413,47 @@ def test_zero_length_route_is_rejected() -> None:
             departure_at=DEPARTURE,
             duration_seconds=3600.0,
         )
+
+
+@pytest.mark.parametrize(
+    ("total_miles", "interval_miles", "expected_distances"),
+    [
+        (5.0, 10.0, [0.0, 5.0]),
+        (5.0, 25.0, [0.0, 5.0]),
+        (5.0, 50.0, [0.0, 5.0]),
+        (10.0, 10.0, [0.0, 10.0]),
+        (10.0, 25.0, [0.0, 10.0]),
+        (10.0, 50.0, [0.0, 10.0]),
+        (15.0, 10.0, [0.0, 10.0, 15.0]),
+        (15.0, 25.0, [0.0, 15.0]),
+        (15.0, 50.0, [0.0, 15.0]),
+        (25.0, 10.0, [0.0, 10.0, 20.0, 25.0]),
+        (25.0, 25.0, [0.0, 25.0]),
+        (25.0, 50.0, [0.0, 25.0]),
+        (30.0, 25.0, [0.0, 25.0, 30.0]),
+        (50.0, 25.0, [0.0, 25.0, 50.0]),
+        (50.0, 50.0, [0.0, 50.0]),
+        (60.0, 50.0, [0.0, 50.0, 60.0]),
+    ],
+)
+def test_short_route_boundaries_sample_origin_and_destination(
+    total_miles: float, interval_miles: float, expected_distances: list[float]
+) -> None:
+    """
+    Routes shorter than, equal to, or between intervals always yield the
+    origin, every in-range interval multiple, and the destination exactly
+    once each, with ETAs from departure to full duration.
+    """
+    checkpoints = generate_checkpoints(
+        equator_route(total_miles, step_miles=total_miles / 2),
+        interval_miles=interval_miles,
+        departure_at=DEPARTURE,
+        duration_seconds=3600.0,
+    )
+
+    assert [round(cp.distance_miles, 6) for cp in checkpoints] == expected_distances
+    assert [cp.sequence for cp in checkpoints] == list(
+        range(1, len(expected_distances) + 1)
+    )
+    assert checkpoints[0].eta == DEPARTURE
+    assert checkpoints[-1].eta == DEPARTURE + timedelta(seconds=3600.0)

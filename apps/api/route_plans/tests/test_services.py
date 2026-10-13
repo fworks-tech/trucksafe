@@ -13,6 +13,7 @@ from providers.protocols import (
     RoutingProvider,
     WeatherProvider,
 )
+from risk.schemas import WeatherObservation
 from route_plans.services import (
     Endpoint,
     PlannedRoutePlan,
@@ -258,3 +259,34 @@ def test_enriched_geometry_preserves_endpoints() -> None:
         enriched = route.enriched_geometry.points
         assert enriched[0] == geometry.points[0]
         assert enriched[-1] == geometry.points[-1]
+
+
+class _RecordingWeatherProvider:
+    """Capture every lookup timestamp, then return calm weather."""
+
+    def __init__(self) -> None:
+        """Initialize the empty timestamp log."""
+        self.valid_times: list[datetime] = []
+
+    def get_weather(
+        self, latitude: float, longitude: float, *, valid_time: datetime
+    ) -> WeatherObservation:
+        """Log the lookup time and return a low-risk observation."""
+        self.valid_times.append(valid_time)
+        return WeatherObservation(
+            wind_mph=10.0, rain_inches_per_hour=0.0, snow_inches_per_hour=0.0
+        )
+
+
+def test_weather_lookups_use_distinct_checkpoint_etas() -> None:
+    """Each checkpoint ETA reaches the weather provider as its valid_time."""
+    weather = _RecordingWeatherProvider()
+    result = plan(weather_provider=weather)
+
+    first_route = result.routes[0]
+    expected = [checkpoint.eta for checkpoint in first_route.checkpoints]
+    assert len(expected) >= 2
+    assert expected == sorted(expected)
+    assert len(set(expected)) == len(expected)
+    assert weather.valid_times[: len(expected)] == expected
+    assert all(valid_time.tzinfo is not None for valid_time in weather.valid_times)

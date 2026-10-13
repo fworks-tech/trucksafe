@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Container, CssBaseline, ThemeProvider, Typography } from '@mui/material';
+import { Box, CssBaseline, ThemeProvider } from '@mui/material';
 import { useState } from 'react';
 
 import { RoutePlanPage } from '../components/route-plan-page/RoutePlanPage';
@@ -22,16 +22,19 @@ export function App(): React.JSX.Element {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <ErrorBoundary>
-          <Container maxWidth="lg" component="main" sx={{ py: { xs: 3, md: 5 } }}>
-            <Typography variant="h1" component="h1" gutterBottom>
-              TruckSafe Route Planner
-            </Typography>
-            <Typography variant="body1" color="text.secondary" paragraph>
-              Plan a truck route and compare weather-risk alternatives. Results use
-              deterministic demonstration data, not live weather.
-            </Typography>
+          {/* Map-first shell: one fixed viewport-height layer. The map
+              fills it; the planning panel floats above it. */}
+          <Box
+            component="main"
+            sx={{
+              position: 'fixed',
+              inset: 0,
+              overflow: 'hidden',
+              bgcolor: 'background.default',
+            }}
+          >
             <RoutePlanPage />
-          </Container>
+          </Box>
         </ErrorBoundary>
       </ThemeProvider>
     </QueryClientProvider>

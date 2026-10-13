@@ -1,7 +1,9 @@
-import { Box, Stack, Typography } from '@mui/material';
+import { ExpandMore, TrendingDown } from '@mui/icons-material';
+import { Box, IconButton, Paper, Stack, Typography } from '@mui/material';
+import { useState } from 'react';
 
-import { riskTokens } from '../../app/theme';
 import { RISK_LABELS } from '../../features/route-planning/risk';
+import { riskColorFor, riskColors } from '../../features/route-planning/riskColors';
 import type { RiskLevel } from '../../features/route-planning/types';
 
 function LineSwatch({
@@ -64,98 +66,138 @@ const CHECKPOINT_RISKS: readonly (RiskLevel | 'unavailable')[] = [
   'unavailable',
 ];
 
-function checkpointColor(level: RiskLevel | 'unavailable'): string {
-  if (level === 'unavailable') return '#78909c';
-  switch (level) {
-    case 'LOW':
-      return '#1b5e20';
-    case 'MODERATE':
-      return '#7a5c00';
-    case 'HIGH':
-      return '#8a3c00';
-    case 'SEVERE':
-      return '#a31226';
-    case 'NO_TRAVEL':
-      return '#5c0a14';
-  }
+export interface MapLegendProps {
+  /** Start collapsed (mobile default); the user can always expand. */
+  defaultCollapsed?: boolean;
 }
 
-/** Text legend decoding every map treatment; swatches are decorative. */
-export function RouteMapLegend(): React.JSX.Element {
+/** Floating legend decoding every map treatment as text; swatches are
+ * decorative. Collapsible so it never obscures the map on small screens. */
+export function RouteMapLegend({
+  defaultCollapsed = false,
+}: MapLegendProps): React.JSX.Element {
+  const [expanded, setExpanded] = useState(!defaultCollapsed);
   return (
-    <Box component="figure" sx={{ m: 0 }}>
-      <Typography component="figcaption" variant="subtitle2" gutterBottom>
-        Map legend
-      </Typography>
-      <Stack spacing={0.5}>
-        <LineSwatch
-          color="#0d47a1"
-          width={5}
-          dashed={false}
-          label="Recommended route (wider, solid blue)"
-        />
-        <LineSwatch
-          color="#0d47a1"
-          width={3}
-          dashed={false}
-          label="Selected route (highlighted)"
-        />
-        <LineSwatch
-          color="#455a64"
-          width={3}
-          dashed={false}
-          label="Other eligible route"
-        />
-        <LineSwatch
-          color="#9e9e9e"
-          width={3}
-          dashed
-          label="Ineligible route (dashed gray)"
-        />
-        <LineSwatch
-          color={riskTokens.noTravel.background}
-          width={3}
-          dashed
-          label="No Travel route (dashed dark red, never safe)"
-        />
-        <Typography variant="body2" sx={{ pt: 1, fontWeight: 600 }}>
-          Segment risk
-        </Typography>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-          {CHECKPOINT_RISKS.map((level) => (
-            <Box
-              key={`segment-${level}`}
-              sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}
-            >
-              <Box
-                aria-hidden="true"
-                sx={{
-                  width: 24,
-                  borderTop: `3px solid ${checkpointColor(level)}`,
-                }}
-              />
-              <Typography variant="body2">
-                {level === 'unavailable'
-                  ? 'Segment: risk unavailable'
-                  : `Segment: ${RISK_LABELS[level]} risk`}
-              </Typography>
-            </Box>
-          ))}
+    <Paper
+      elevation={3}
+      sx={{
+        p: 1,
+        maxWidth: 320,
+        borderRadius: 2,
+        bgcolor: 'rgba(255, 255, 255, 0.92)',
+      }}
+    >
+      <Box
+        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+          <TrendingDown fontSize="small" aria-hidden="true" />
+          <Typography variant="subtitle2" component="span">
+            Map legend
+          </Typography>
         </Box>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, pt: 0.5 }}>
-          {CHECKPOINT_RISKS.map((level) => (
-            <DotSwatch
-              key={level}
-              color={checkpointColor(level)}
-              label={
-                level === 'unavailable'
-                  ? 'Checkpoint: weather unavailable'
-                  : `Checkpoint: ${RISK_LABELS[level]} risk`
-              }
+        <IconButton
+          size="small"
+          aria-expanded={expanded}
+          aria-controls="map-legend-content"
+          aria-label={expanded ? 'Collapse map legend' : 'Expand map legend'}
+          onClick={() => setExpanded((open) => !open)}
+        >
+          <ExpandMore
+            sx={{
+              transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 150ms',
+            }}
+          />
+        </IconButton>
+      </Box>
+      {expanded && (
+        <Box
+          component="figure"
+          id="map-legend-content"
+          tabIndex={0}
+          aria-label="Map legend details"
+          sx={{ m: 0, maxHeight: '40vh', overflowY: 'auto', pr: 0.5 }}
+        >
+          <Stack spacing={0.5}>
+            <LineSwatch
+              color="#0d47a1"
+              width={5}
+              dashed={false}
+              label="Recommended route (wider, solid blue)"
             />
-          ))}
+            <LineSwatch
+              color="#0d47a1"
+              width={3}
+              dashed={false}
+              label="Selected route (highlighted)"
+            />
+            <LineSwatch
+              color="#455a64"
+              width={3}
+              dashed={false}
+              label="Other eligible route"
+            />
+            <LineSwatch
+              color="#9e9e9e"
+              width={3}
+              dashed
+              label="Ineligible route (dashed gray)"
+            />
+            <LineSwatch
+              color={riskColors.NO_TRAVEL}
+              width={3}
+              dashed
+              label="No Travel route (dashed dark red, never safe)"
+            />
+            <Typography variant="body2" sx={{ pt: 1, fontWeight: 600 }}>
+              Segment risk
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: 'block' }}
+            >
+              Weather-grid circles use these colors; larger circles mean higher forecast
+              risk.
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+              {CHECKPOINT_RISKS.map((level) => (
+                <Box
+                  key={`segment-${level}`}
+                  sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}
+                >
+                  <Box
+                    aria-hidden="true"
+                    sx={{
+                      width: 24,
+                      borderTop: `3px solid ${riskColorFor(level)}`,
+                    }}
+                  />
+                  <Typography variant="body2">
+                    {level === 'unavailable'
+                      ? 'Segment: risk unavailable'
+                      : `Segment: ${RISK_LABELS[level]} risk`}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, pt: 0.5 }}>
+              {CHECKPOINT_RISKS.map((level) => (
+                <DotSwatch
+                  key={level}
+                  color={riskColorFor(level)}
+                  label={
+                    level === 'unavailable'
+                      ? 'Checkpoint: weather unavailable'
+                      : `Checkpoint: ${RISK_LABELS[level]} risk`
+                  }
+                />
+              ))}
+            </Box>
+          </Stack>
         </Box>
-      </Stack>
-    </Box>
+      )}
+    </Paper>
   );
 }

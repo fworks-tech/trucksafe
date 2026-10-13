@@ -55,11 +55,25 @@ const { FakeMap } = vi.hoisted(() => {
 
     addSource(): void {}
 
-    getSource(): { setData: () => void } {
+    getSource(): { setData: () => void } | undefined {
       return { setData: () => {} };
     }
 
+    getLayer(): undefined {
+      return undefined;
+    }
+
     addLayer(): void {}
+
+    removeLayer(): void {}
+
+    removeSource(): void {}
+
+    setLayoutProperty(): void {}
+
+    zoomIn(): void {}
+
+    zoomOut(): void {}
 
     setFilter(layer: string, filter: unknown): void {
       this.filters[layer] = filter;
@@ -127,6 +141,25 @@ afterEach(() => {
 });
 
 describe('RouteMapSection', () => {
+  it('destroys a map creation that resolves only after unmount', async () => {
+    // StrictMode-style remount: the first creation resolves into a dead
+    // container. It must destroy itself, never paint into a dead element.
+    stubWebgl();
+    const { unmount } = renderWithProviders(
+      <RouteMapSection
+        response={makeRoutePlan()}
+        selectedRouteId="route-1"
+        onSelectRoute={() => {}}
+      />,
+    );
+    unmount();
+    const map = FakeMap.instances[0];
+    expect(map).toBeDefined();
+    expect(map!.removed).toBe(false);
+    map!.emit('load');
+    await waitFor(() => expect(map!.removed).toBe(true));
+  });
+
   it('renders the map, legend, and accessible route list', async () => {
     stubWebgl();
     const plan = makeRoutePlan();
@@ -149,10 +182,10 @@ describe('RouteMapSection', () => {
     const options = screen.getAllByRole('radio');
     expect(options).toHaveLength(3);
     expect(
-      screen.getByRole('radio', { name: /route-1.*recommended/i }),
+      screen.getByRole('radio', { name: /route 1.*recommended/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('radio', { name: /route-2.*alternative/i }),
+      screen.getByRole('radio', { name: /route 2.*alternative/i }),
     ).toBeInTheDocument();
   });
 
@@ -173,7 +206,7 @@ describe('RouteMapSection', () => {
       expect(screen.queryByLabelText('Loading map')).not.toBeInTheDocument();
     });
     // List -> callback.
-    await user.click(screen.getByRole('radio', { name: /route-2.*alternative/i }));
+    await user.click(screen.getByRole('radio', { name: /route 2.*alternative/i }));
     expect(seen).toEqual(['route-2']);
     // Map click -> callback.
     FakeMap.instances[0]?.clickLayer('trucksafe-route-lines', {
@@ -251,7 +284,7 @@ describe('RouteMapSection', () => {
     expect(screen.getByText('Map unavailable for this result')).toBeInTheDocument();
     expect(FakeMap.instances).toHaveLength(0);
     // The list alternative still works.
-    expect(screen.getByRole('radio', { name: /route-1.*no map geometry/i }));
+    expect(screen.getByRole('radio', { name: /route 1.*no map geometry/i }));
     expect(seen).toEqual([]);
   });
 

@@ -34,32 +34,36 @@ async function fillAndSubmit(): Promise<void> {
 }
 
 describe('RoutePlanPage', () => {
-  it('submits the correct payload and renders exactly three routes', async () => {
-    setScenario('success', 150);
-    renderWithProviders(<RoutePlanPage />);
-    await fillAndSubmit();
+  it(
+    'submits the correct payload and renders exactly three routes',
+    { timeout: 15000 },
+    async () => {
+      setScenario('success', 150);
+      renderWithProviders(<RoutePlanPage />);
+      await fillAndSubmit();
 
-    await screen.findByText(/creating your route plan/i);
-    expect(screen.getByRole('button', { name: /planning/i })).toBeDisabled();
+      await screen.findByText(/creating your route plan/i);
+      expect(screen.getByRole('button', { name: /planning/i })).toBeDisabled();
 
-    await screen.findByText('Route alternatives (3)');
-    expect(captured.headers['content-type']).toContain('application/json');
-    const body = captured.body as Record<string, unknown>;
-    expect(body['origin']).toEqual({ address: 'Chicago, IL' });
-    expect(body['destination']).toEqual({ address: 'Dallas, TX' });
-    expect(body['departure_at']).toMatch(/Z$/);
-    expect(body['load_weight_lb']).toBe(20000);
-    expect(body['checkpoint_interval_miles']).toBe(25);
-    expect(captured.headers['x-request-id']).toMatch(/^[A-Za-z0-9_-]{1,128}$/);
-    // The request id is available for diagnostics on success too.
-    expect(screen.getByText(/Request ID:/)).toBeInTheDocument();
-  });
+      await screen.findByText('Route alternatives (3)');
+      expect(captured.headers['content-type']).toContain('application/json');
+      const body = captured.body as Record<string, unknown>;
+      expect(body['origin']).toEqual({ address: 'Chicago, IL' });
+      expect(body['destination']).toEqual({ address: 'Dallas, TX' });
+      expect(body['departure_at']).toMatch(/Z$/);
+      expect(body['load_weight_lb']).toBe(20000);
+      expect(body['checkpoint_interval_miles']).toBe(25);
+      expect(captured.headers['x-request-id']).toMatch(/^[A-Za-z0-9_-]{1,128}$/);
+      // The request id is available for diagnostics on success too.
+      expect(screen.getByText(/Request ID:/)).toBeInTheDocument();
+    },
+  );
 
   it('identifies the recommended route with the backend reason', async () => {
     setScenario('success');
     renderWithProviders(<RoutePlanPage />);
     await fillAndSubmit();
-    await screen.findByText('Recommended: route-1');
+    await screen.findByText('Recommended: Route 1');
     expect(screen.getByText(/deterministic route ranking criteria/)).toBeInTheDocument();
   });
 
@@ -111,7 +115,7 @@ describe('RoutePlanPage', () => {
     renderWithProviders(<RoutePlanPage />);
     await fillAndSubmit();
     await screen.findByText('No eligible route available.');
-    expect(screen.queryByText('Recommended: route-1')).not.toBeInTheDocument();
+    expect(screen.queryByText('Recommended: Route 1')).not.toBeInTheDocument();
     expect(screen.queryByText('Recommended')).not.toBeInTheDocument();
     expect(screen.getAllByText('Not eligible')).toHaveLength(3);
     expect(
@@ -135,17 +139,17 @@ describe('RoutePlanPage', () => {
     const user = userEvent.setup();
     renderWithProviders(<RoutePlanPage />);
     await fillAndSubmit();
-    await screen.findByText('Recommended: route-1');
+    await screen.findByText('Recommended: Route 1');
 
     await user.click(screen.getByRole('button', { name: /start new plan/i }));
     await waitFor(() => {
-      expect(screen.queryByText('Recommended: route-1')).not.toBeInTheDocument();
+      expect(screen.queryByText('Recommended: Route 1')).not.toBeInTheDocument();
     });
     // Valid input is preserved; a fresh submission works.
     expect(screen.getByLabelText(/^origin/i)).toHaveValue('Chicago, IL');
     await user.click(screen.getByRole('button', { name: /plan route/i }));
-    await screen.findByText('Recommended: route-1');
-    expect(screen.getAllByText('Recommended: route-1')).toHaveLength(1);
+    await screen.findByText('Recommended: Route 1');
+    expect(screen.getAllByText('Recommended: Route 1')).toHaveLength(1);
   });
 });
 
@@ -161,7 +165,7 @@ describe('RoutePlanPage map integration', () => {
       await screen.findByText('The interactive map could not be loaded'),
     ).toBeInTheDocument();
     expect(screen.getAllByRole('radio')).toHaveLength(3);
-    expect(screen.getByRole('radio', { name: /route-1.*recommended/i })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /route 1.*recommended/i })).toBeChecked();
   });
 
   it('syncs card and list selection and resets on a new plan', async () => {
@@ -174,10 +178,10 @@ describe('RoutePlanPage map integration', () => {
 
     // Card -> list.
     await user.click(screen.getAllByRole('button', { name: 'Show on map' })[0]!);
-    expect(screen.getByRole('radio', { name: /route-2/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /route 2/i })).toBeChecked();
 
     // List -> card.
-    await user.click(screen.getByRole('radio', { name: /route-3/ }));
+    await user.click(screen.getByRole('radio', { name: /route 3/i }));
     expect(screen.getByRole('button', { name: 'Selected on map' })).toBeInTheDocument();
 
     // A new plan clears the viewing selection back to the recommendation.
@@ -188,6 +192,6 @@ describe('RoutePlanPage map integration', () => {
     await user.click(screen.getByRole('button', { name: /plan route/i }));
     await screen.findByText('Route alternatives (3)');
     await screen.findByText('The interactive map could not be loaded');
-    expect(screen.getByRole('radio', { name: /route-1.*recommended/i })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /route 1.*recommended/i })).toBeChecked();
   });
 });

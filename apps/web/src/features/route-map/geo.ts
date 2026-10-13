@@ -10,6 +10,7 @@
  */
 
 import { worstRiskLevel } from '../route-planning/risk';
+import { riskColors } from '../route-planning/riskColors';
 import type {
   CheckpointPayload,
   RiskLevel,
@@ -393,14 +394,14 @@ export function normalizeWeatherGrid(grid: WeatherGridResponse): NormalizedWeath
   };
 }
 
-/** Risk level to color mapping for heatmap circles. */
+/** Risk level to color mapping for heatmap circles (from central tokens). */
 export const HEATMAP_RISK_COLORS: Record<RiskLevel | 'unavailable', string> = {
-  LOW: '#1b5e20',
-  MODERATE: '#7a5c00',
-  HIGH: '#8a3c00',
-  SEVERE: '#a31226',
-  NO_TRAVEL: '#5c0a14',
-  unavailable: '#78909c',
+  LOW: riskColors.LOW,
+  MODERATE: riskColors.MODERATE,
+  HIGH: riskColors.HIGH,
+  SEVERE: riskColors.SEVERE,
+  NO_TRAVEL: riskColors.NO_TRAVEL,
+  unavailable: riskColors.UNAVAILABLE,
 };
 
 /** Risk level to radius mapping for heatmap circles. */

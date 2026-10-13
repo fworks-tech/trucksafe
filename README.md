@@ -67,17 +67,19 @@ Run the backend suite with `python -m pytest` from `apps/api` (see Testing Strat
 
 ### Planned (Not Implemented Yet)
 
-- React frontend: weather heatmap and forecast slider visualization
-  (form, route cards, base route map, and segment-level risk coloring are
-  implemented)
 - OpenAPI contract in `packages/contracts/openapi.yaml`
-- Real routing and weather provider adapters (timeouts, backoff, unit conversion)
-- `GET` route-plan retrieval and weather-grid endpoints
+- Real weather provider adapter (routing has an optional OSRM/Photon
+  adapter; weather is mock-only)
+- `GET` route-plan retrieval endpoint
 - PostgreSQL/PostGIS persistence, Redis caching, Celery tasks
-- Docker, Docker Compose, CI/CD workflows
-- API contract tests and Playwright end-to-end tests
+- Docker, Docker Compose, CD workflows (CI runs backend, web, and e2e checks)
+- API contract tests
 
-**No external routing or weather provider is connected yet.** The backend currently runs on Django defaults with SQLite and needs no external services or credentials.
+Routing and weather run on deterministic mock providers by default and
+need no external services or credentials. Setting
+`TRUCKSAFE_ROUTING_PROVIDER=osrm` selects the road-following OSRM/Photon
+routing adapter (internet access required, no credentials); the weather
+provider has no real adapter in this slice.
 
 ---
 
@@ -298,6 +300,10 @@ admin path. The full contract is documented in [docs/api.md](docs/api.md).
 integrations exist yet — routing, geocoding, and weather go through
 deterministic mock adapters resolved by the provider factory — so no
 `.env` file is required to run the backend locally.
+
+Routing provider selection is opt-in via `TRUCKSAFE_ROUTING_PROVIDER`: `mock`
+(default, offline, deterministic) or `osrm` (real road geometry via the public
+OSRM demo server plus Photon geocoding; no key needed, needs internet).
 
 Never commit `.env` files or private credentials.
 
@@ -751,7 +757,7 @@ A `SECURITY.md` policy file is planned and does not exist yet.
 - [Risk Model](docs/risk-model.md)
 - [Testing Strategy](docs/testing.md)
 - [Architecture Decisions](docs/decisions/)
-- [Deployment](docs/deployment.md) — placeholder; content not yet written
+- [Deployment](docs/deployment.md)
 
 ---
 

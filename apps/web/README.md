@@ -23,11 +23,18 @@ Implemented:
   accessible route list that works with or without the visual map. The map
   degrades to the textual comparison whenever geometry or map rendering is
   unavailable.
+- Weather heatmap (MapLibre layer): backend-classified risk cells from
+  `GET /route-plans/{id}/weather-grid`, gray for unavailable data, plus a
+  visible legend and textual risk information.
+- Forecast slider (`0`–`48` hours): debounced per-offset requests with a
+  per-plan cache, stale-response guards, loading/error states, and an
+  absolute UTC timestamp next to the relative offset.
 - Vitest + React Testing Library + MSW tests, axe accessibility checks,
-  and Playwright end-to-end coverage of the critical flows.
+  and Playwright end-to-end coverage of the critical flows (including
+  slider movement and forecast-failure degradation).
 
-Deferred (not implemented): weather heatmap, forecast slider,
-real provider adapters, OpenAPI-generated client, Storybook,
+Deferred (not implemented): real provider adapters beyond the optional
+OSRM/Photon routing adapter, OpenAPI-generated client, Storybook,
 production deployment, authentication, observability, rate limiting.
 
 Results use deterministic demonstration data from the backend mock
