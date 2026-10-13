@@ -29,15 +29,19 @@ export const riskTokens: Record<
 export const statusTokens = {
   eligible: { background: '#e6f4ea', text: '#1b5e20', border: '#a3d9b1' },
   ineligible: { background: '#fde7e9', text: '#a31226', border: '#f3a8b2' },
-  recommended: { background: '#e3f2fd', text: '#0d47a1', border: '#90caf9' },
+  // Teal family sampled from the logo shield; white-on-navy equivalent
+  // contrast to the old MUI blue.
+  recommended: { background: '#dff0f1', text: '#0f4c4e', border: '#93cace' },
 } satisfies Record<string, RiskToken>;
 
 export const theme = createTheme({
   palette: {
     mode: 'light',
-    primary: { main: '#0d47a1' },
-    secondary: { main: '#455a64' },
-    background: { default: '#f5f7fa', paper: '#ffffff' },
+    // Brand palette sampled from public/logo-sidebar.png (means of the
+    // saturated pixel clusters): navy wordmark, green wordmark accent.
+    primary: { main: '#1c4666' },
+    secondary: { main: '#4e8657' },
+    background: { default: '#f3f6f7', paper: '#ffffff' },
     text: { primary: '#1a2332', secondary: '#455a64' },
     warning: { main: '#8a3c00' },
     error: { main: '#a31226' },
@@ -57,7 +61,7 @@ export const theme = createTheme({
         // Visible focus indicator everywhere; MUI outlines alone can be
         // subtle against custom backgrounds.
         '*:focus-visible': {
-          outline: '3px solid #0d47a1',
+          outline: '3px solid #1c4666',
           outlineOffset: '2px',
         },
         '@media (prefers-reduced-motion: reduce)': {
