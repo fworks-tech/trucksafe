@@ -50,12 +50,16 @@ describe('accessibility', () => {
     server.use(routePlansHandler('success'));
     const user = userEvent.setup();
     const { container } = renderWithProviders(<App />);
+    // Origin, departure, and load ship prefilled; clear before typing.
+    await user.clear(screen.getByLabelText(/^origin/i));
     await user.type(screen.getByLabelText(/^origin/i), 'Chicago, IL');
     await user.type(screen.getByLabelText(/^destination/i), 'Dallas, TX');
+    await user.clear(screen.getByLabelText(/departure date and time/i));
     await user.type(
       screen.getByLabelText(/departure date and time/i),
       '2026-10-12T14:30',
     );
+    await user.clear(screen.getByLabelText(/load weight/i));
     await user.type(screen.getByLabelText(/load weight/i), '20000');
     await user.click(screen.getByRole('button', { name: /plan route/i }));
     await screen.findByText('Route alternatives (3)');
@@ -66,12 +70,15 @@ describe('accessibility', () => {
     server.use(routePlansHandler('badRequest'));
     const user = userEvent.setup();
     renderWithProviders(<App />);
+    await user.clear(screen.getByLabelText(/^origin/i));
     await user.type(screen.getByLabelText(/^origin/i), 'Chicago, IL');
     await user.type(screen.getByLabelText(/^destination/i), 'Dallas, TX');
+    await user.clear(screen.getByLabelText(/departure date and time/i));
     await user.type(
       screen.getByLabelText(/departure date and time/i),
       '2026-10-12T14:30',
     );
+    await user.clear(screen.getByLabelText(/load weight/i));
     await user.type(screen.getByLabelText(/load weight/i), '20000');
     await user.click(screen.getByRole('button', { name: /plan route/i }));
     await screen.findByText('Please review the route plan details.');

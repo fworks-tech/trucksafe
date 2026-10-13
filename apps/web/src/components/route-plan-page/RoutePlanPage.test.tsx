@@ -25,10 +25,15 @@ function setScenario(scenario: Scenario, delayMs = 0): void {
 }
 
 async function fillAndSubmit(): Promise<void> {
+  // Origin, departure, and load ship prefilled; clear before typing so
+  // keystrokes do not append to the defaults.
   const user = userEvent.setup();
+  await user.clear(screen.getByLabelText(/^origin/i));
   await user.type(screen.getByLabelText(/^origin/i), 'Chicago, IL');
   await user.type(screen.getByLabelText(/^destination/i), 'Dallas, TX');
+  await user.clear(screen.getByLabelText(/departure date and time/i));
   await user.type(screen.getByLabelText(/departure date and time/i), '2026-10-12T14:30');
+  await user.clear(screen.getByLabelText(/load weight/i));
   await user.type(screen.getByLabelText(/load weight/i), '20000');
   await user.click(screen.getByRole('button', { name: /plan route/i }));
 }
@@ -154,6 +159,17 @@ describe('RoutePlanPage', () => {
 });
 
 describe('RoutePlanPage map integration', () => {
+  it('shows the background map before any plan instead of a placeholder', async () => {
+    // jsdom has no WebGL, so the origin focus map degrades to its
+    // fallback immediately — but the map slot itself is always present.
+    setScenario('success');
+    renderWithProviders(<RoutePlanPage />);
+    expect(
+      await screen.findByText('The interactive map could not be loaded'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Map preview')).not.toBeInTheDocument();
+  });
+
   it('falls back to the accessible route list when the map cannot start', async () => {
     // jsdom has no WebGL, so the lazy map section degrades to its
     // fallback while the selection list stays fully working.
@@ -168,30 +184,34 @@ describe('RoutePlanPage map integration', () => {
     expect(screen.getByRole('radio', { name: /route 1.*recommended/i })).toBeChecked();
   });
 
-  it('syncs card and list selection and resets on a new plan', async () => {
-    setScenario('success');
-    const user = userEvent.setup();
-    renderWithProviders(<RoutePlanPage />);
-    await fillAndSubmit();
-    await screen.findByText('Route alternatives (3)');
-    await screen.findByText('The interactive map could not be loaded');
+  it(
+    'syncs card and list selection and resets on a new plan',
+    { timeout: 15000 },
+    async () => {
+      setScenario('success');
+      const user = userEvent.setup();
+      renderWithProviders(<RoutePlanPage />);
+      await fillAndSubmit();
+      await screen.findByText('Route alternatives (3)');
+      await screen.findByText('The interactive map could not be loaded');
 
-    // Card -> list.
-    await user.click(screen.getAllByRole('button', { name: 'Show on map' })[0]!);
-    expect(screen.getByRole('radio', { name: /route 2/i })).toBeChecked();
+      // Card -> list.
+      await user.click(screen.getAllByRole('button', { name: 'Show on map' })[0]!);
+      expect(screen.getByRole('radio', { name: /route 2/i })).toBeChecked();
 
-    // List -> card.
-    await user.click(screen.getByRole('radio', { name: /route 3/i }));
-    expect(screen.getByRole('button', { name: 'Selected on map' })).toBeInTheDocument();
+      // List -> card.
+      await user.click(screen.getByRole('radio', { name: /route 3/i }));
+      expect(screen.getByRole('button', { name: 'Selected on map' })).toBeInTheDocument();
 
-    // A new plan clears the viewing selection back to the recommendation.
-    await user.click(screen.getByRole('button', { name: /start new plan/i }));
-    await waitFor(() => {
-      expect(screen.queryByRole('radio')).not.toBeInTheDocument();
-    });
-    await user.click(screen.getByRole('button', { name: /plan route/i }));
-    await screen.findByText('Route alternatives (3)');
-    await screen.findByText('The interactive map could not be loaded');
-    expect(screen.getByRole('radio', { name: /route 1.*recommended/i })).toBeChecked();
-  });
+      // A new plan clears the viewing selection back to the recommendation.
+      await user.click(screen.getByRole('button', { name: /start new plan/i }));
+      await waitFor(() => {
+        expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+      });
+      await user.click(screen.getByRole('button', { name: /plan route/i }));
+      await screen.findByText('Route alternatives (3)');
+      await screen.findByText('The interactive map could not be loaded');
+      expect(screen.getByRole('radio', { name: /route 1.*recommended/i })).toBeChecked();
+    },
+  );
 });

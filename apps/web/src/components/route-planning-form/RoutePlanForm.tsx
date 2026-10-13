@@ -4,6 +4,7 @@ import {
   Autocomplete,
   Box,
   Button,
+  Chip,
   FormControl,
   FormHelperText,
   InputAdornment,
@@ -17,12 +18,13 @@ import {
 import { Controller, useForm } from 'react-hook-form';
 import { useState } from 'react';
 
-import { US_CITIES } from '../../features/route-planning/cities';
+import { US_CITIES, DEFAULT_ORIGIN_CITY } from '../../features/route-planning/cities';
 import {
   routePlanFormSchema,
   type RoutePlanFormValues,
 } from '../../features/route-planning/schemas';
 import { CHECKPOINT_INTERVALS } from '../../features/route-planning/types';
+import { toLocalInputValue } from '../../lib/datetime';
 
 /** Accessible quick examples: they only prefill addresses, never submit. */
 const QUICK_EXAMPLES = [
@@ -34,6 +36,8 @@ interface RoutePlanFormProps {
   onSubmit: (values: RoutePlanFormValues) => void;
   isPending: boolean;
   onCancel: () => void;
+  /** Fires when the origin text changes so the background map can follow. */
+  onOriginChange?: (city: string) => void;
 }
 
 /** Route-plan input form. Client validation improves UX; backend is final. */
@@ -41,6 +45,7 @@ export function RoutePlanForm({
   onSubmit,
   isPending,
   onCancel,
+  onOriginChange,
 }: RoutePlanFormProps): React.JSX.Element {
   const {
     register,
@@ -50,17 +55,25 @@ export function RoutePlanForm({
     formState: { errors },
   } = useForm<RoutePlanFormValues>({
     resolver: zodResolver(routePlanFormSchema),
+    // Sensible starting point: Chicago today with a light load; the user
+    // only needs a destination to plan.
     defaultValues: {
-      origin: '',
+      origin: DEFAULT_ORIGIN_CITY,
       destination: '',
-      departure: '',
+      departure: toLocalInputValue(new Date()),
+      loadWeight: 30,
       checkpointInterval: 25,
     },
   });
   // Mirror of the typed text: RHF only commits freeSolo text on blur or
   // option pick, but keystrokes must stay visible while typing.
-  const [originText, setOriginText] = useState('');
+  const [originText, setOriginText] = useState(DEFAULT_ORIGIN_CITY);
   const [destinationText, setDestinationText] = useState('');
+
+  const notifyOrigin = (city: string): void => {
+    setOriginText(city);
+    onOriginChange?.(city);
+  };
 
   /** City input with suggestions; free text stays allowed for real geocoding. */
   function cityField(
@@ -85,11 +98,13 @@ export function RoutePlanForm({
             onInputChange={(_event, value) => {
               setText(value);
               field.onChange(value);
+              if (name === 'origin') onOriginChange?.(value);
             }}
             onChange={(_event, value) => {
               const next = typeof value === 'string' ? value : '';
               setText(next);
               field.onChange(next);
+              if (name === 'origin') onOriginChange?.(next);
             }}
             onBlur={field.onBlur}
             disabled={isPending}
@@ -125,20 +140,28 @@ export function RoutePlanForm({
           </Typography>
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', pt: 0.5 }}>
             {QUICK_EXAMPLES.map((example) => (
-              <Button
+              <Chip
                 key={example.origin}
-                type="button"
                 size="small"
                 variant="outlined"
+                color="primary"
+                clickable
                 onClick={() => {
                   setValue('origin', example.origin);
                   setValue('destination', example.destination);
-                  setOriginText(example.origin);
+                  notifyOrigin(example.origin);
                   setDestinationText(example.destination);
                 }}
-              >
-                {`${example.origin} to ${example.destination}`}
-              </Button>
+                label={`${example.origin} to ${example.destination}`}
+                sx={{
+                  flex: '1 1 calc(50% - 4px)',
+                  justifyContent: 'center',
+                  '& .MuiChip-label': {
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  },
+                }}
+              />
             ))}
           </Stack>
         </Box>
