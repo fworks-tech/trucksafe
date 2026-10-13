@@ -58,3 +58,17 @@ export function parseLocalParts(value: string): LocalParts | null {
   if (hour > 23 || minute > 59) return null;
   return { year, month, day, hour, minute };
 }
+
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+
+/**
+ * Format a Date as a `datetime-local` input value (`YYYY-MM-DDTHH:mm`)
+ * in the user's local timezone, truncating seconds. Used for the
+ * departure default ("today, now").
+ */
+export function toLocalInputValue(date: Date): string {
+  return (
+    `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}` +
+    `T${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+  );
+}
