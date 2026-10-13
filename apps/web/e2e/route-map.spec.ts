@@ -40,9 +40,15 @@ async function expectMapRegion(page: Page): Promise<void> {
   });
 }
 
-/** Small screens start with the planning sheet expanded (bottom-sheet
- * pattern); collapse it to interact with the floating map overlays. */
+/** Small screens start with the planning sheet at half height; collapse
+ * it to interact with the map itself. Snap order is half -> expanded ->
+ * collapsed, so up to two clicks land collapsed. Desktop has no snap
+ * control and both lookups stay invisible. */
 async function collapseSheetIfExpanded(page: Page): Promise<void> {
+  const expand = page.getByRole('button', { name: 'Expand panel to full height' });
+  if (await expand.isVisible()) {
+    await expand.click();
+  }
   const collapse = page.getByRole('button', { name: 'Collapse panel' });
   if (await collapse.isVisible()) {
     await collapse.click();
@@ -84,12 +90,14 @@ test('shows the route map with three selectable alternatives', async ({ page }) 
   await expectMapRegion(page);
   await expect(page.getByText('Map legend')).toBeVisible();
 
-  const radios = page.getByRole('radio');
-  await expect(radios).toHaveCount(3);
-  const recommended = page.getByRole('radio', { name: /recommended/i });
-  await expect(recommended).toHaveCount(1);
+  // One selection surface only: the bottom-sheet cards (with carousel
+  // dots). No floating radio panel over the map.
+  await expect(page.getByRole('radio')).toHaveCount(0);
+  await expect(page.getByText('Select a route to inspect')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Show Route \d/ })).toHaveCount(3);
+  await expect(page.getByText(/Recommended: Route \d/)).toBeVisible();
   // The backend recommendation is the default selection.
-  await expect(recommended).toBeChecked();
+  await expect(page.getByRole('button', { name: 'Selected on map' })).toHaveCount(1);
 });
 
 test('synchronizes selection between route cards and the map', async ({ page }) => {
@@ -97,16 +105,14 @@ test('synchronizes selection between route cards and the map', async ({ page }) 
   await submitValidPlan(page);
   await expectMapRegion(page);
 
-  // Card -> map list. The RouteCard lives in the planning panel, which is
-  // visible (expanded) on mobile by default.
-  await page.getByRole('button', { name: 'Show on map' }).first().click();
+  // Card button -> selection. Route 3 is picked through the carousel dot;
+  // map-click selection is covered by component tests with a stubbed map.
+  await page.getByRole('button', { name: 'Show Route 3' }).click();
   await expect(page.getByRole('button', { name: 'Selected on map' })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Show on map' })).toHaveCount(2);
 
-  // Map list -> card. The floating route radios sit over the map; on
-  // small screens collapse the sheet first so they are not covered.
-  await collapseSheetIfExpanded(page);
-  await page.getByRole('radio', { name: /route 3/i }).click();
-  await expect(page.getByRole('radio', { name: /route 3/i })).toBeChecked();
+  // Back to the recommended route through its card.
+  await page.getByRole('button', { name: 'Show Route 1' }).click();
   await expect(page.getByRole('button', { name: 'Selected on map' })).toHaveCount(1);
 });
 
@@ -115,11 +121,10 @@ test('supports keyboard route selection', async ({ page }) => {
   await submitValidPlan(page);
   await expectMapRegion(page);
 
-  const checked = page.getByRole('radio', { checked: true });
-  await checked.focus();
-  await page.keyboard.press('ArrowDown');
-  // Exactly one route stays selected and its card reflects it.
-  await expect(page.getByRole('radio', { checked: true })).toHaveCount(1);
+  const show = page.getByRole('button', { name: 'Show on map' }).first();
+  await show.focus();
+  await page.keyboard.press('Enter');
+  // Exactly one route stays selected.
   await expect(page.getByRole('button', { name: 'Selected on map' })).toHaveCount(1);
 });
 
@@ -159,7 +164,7 @@ test('shows the origin map on load and keeps it when a new plan starts', async (
   // Starting over clears results but never removes the map itself: it
   // falls back to the origin focus instead of a placeholder.
   await page.getByRole('button', { name: /start new plan/i }).click();
-  await expect(page.getByRole('radio')).toHaveCount(0);
+  await expect(page.getByText('Route alternatives')).toHaveCount(0);
   await expect(
     page.getByRole('region', { name: /interactive route map/i }),
   ).toBeVisible();
@@ -175,11 +180,17 @@ test('updates the displayed forecast when the slider moves', async ({ page }) =>
   });
   await submitValidPlan(page);
   await expectMapRegion(page);
-  await collapseSheetIfExpanded(page);
+
+  // The forecast lives in the bottom sheet, collapsed at first: expand it.
+  // Hidden accordion content stays out of the accessible tree.
+  await expect(page.getByRole('slider', { name: /forecast hour offset/i })).toHaveCount(
+    0,
+  );
+  await page.getByText('Forecast', { exact: true }).click();
 
   const slider = page.getByRole('slider', { name: /forecast hour offset/i });
   await expect(slider).toBeVisible();
-  await expect(page.getByText('Departure time')).toBeVisible();
+  await expect(page.getByText('Departure time').first()).toBeVisible();
 
   // The settled initial position fetches offset 0 (debounced, cached after).
   await expect.poll(() => gridOffsets, { timeout: 20000 }).toContain(0);
@@ -189,7 +200,7 @@ test('updates the displayed forecast when the slider moves', async ({ page }) =>
   await expect(slider).toBeEnabled({ timeout: 20000 });
   await slider.focus();
   await page.keyboard.press('End');
-  await expect(page.getByText('+48h')).toBeVisible();
+  await expect(page.getByText('+48h').first()).toBeVisible();
   await expect.poll(() => gridOffsets, { timeout: 20000 }).toContain(48);
 
   // Returning to a cached offset updates the display without refetching.
@@ -198,7 +209,7 @@ test('updates the displayed forecast when the slider moves', async ({ page }) =>
   // Grid arrivals re-render the slider and drop focus; re-focus first.
   await slider.focus();
   await page.keyboard.press('Home');
-  await expect(page.getByText('Departure time')).toBeVisible();
+  await expect(page.getByText('Departure time').first()).toBeVisible();
   await page.waitForTimeout(600);
   expect(gridOffsets.length).toBe(requestsBefore);
 });
@@ -221,8 +232,81 @@ test('keeps route results when the forecast request fails', async ({ page }) => 
   await expectMapRegion(page);
 
   // The plan itself succeeded: routes stay, only the forecast degrades.
+  // The error lives in the (collapsed) forecast section: expand it first.
   await expect(page.getByText('Route alternatives (3)')).toBeVisible();
+  await page.getByText('Forecast', { exact: true }).click();
   await expect(page.getByText(/weather forecast unavailable/i)).toBeVisible({
     timeout: 20000,
   });
 });
+
+test.describe('mobile results layout', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('keeps one results surface with no overlap or overflow', async ({ page }) => {
+    await withEmptyBasemap(page);
+    await submitValidPlan(page);
+    await expectMapRegion(page);
+
+    // Single selection surface: bottom-sheet cards only.
+    await expect(page.getByRole('radio')).toHaveCount(0);
+    await expect(page.getByText('Select a route to inspect')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Show Route \d/ })).toHaveCount(3);
+
+    // Forecast collapsed initially: header visible, slider out of the tree.
+    await expect(page.getByText('Forecast', { exact: true })).toBeVisible();
+    await expect(page.getByRole('slider', { name: /forecast hour offset/i })).toHaveCount(
+      0,
+    );
+
+    // No horizontal overflow at 390px.
+    const overflow: number = await page.evaluate(
+      'document.documentElement.scrollWidth - window.innerWidth',
+    );
+    expect(overflow).toBeLessThanOrEqual(1);
+
+    // Snap half -> expanded -> collapsed; the body hides only when collapsed.
+    await page.getByRole('button', { name: 'Expand panel to full height' }).click();
+    await expect(page.getByText('Route alternatives (3)')).toBeVisible();
+    await page.getByRole('button', { name: 'Collapse panel' }).click();
+    await expect(page.getByText('Route alternatives (3)')).toHaveCount(0);
+    await expect(page.getByText('Forecast', { exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Expand panel to half height' }).click();
+    await expect(page.getByText('Route alternatives (3)')).toBeVisible();
+
+    // Every alternative stays reachable; selection syncs with the map.
+    await page.getByRole('button', { name: 'Show Route 3' }).click();
+    await expect(page.getByRole('button', { name: 'Selected on map' })).toHaveCount(1);
+
+    // Forecast expands in place, inside the sheet flow.
+    await page.getByText('Forecast', { exact: true }).click();
+    await expect(
+      page.getByRole('slider', { name: /forecast hour offset/i }),
+    ).toBeVisible();
+  });
+});
+
+for (const viewport of [
+  { width: 375, height: 812 },
+  { width: 768, height: 1024 },
+]) {
+  test.describe(`results layout at ${viewport.width}x${viewport.height}`, () => {
+    test.use({ viewport });
+
+    test('shows every alternative with no overflow', async ({ page }) => {
+      await withEmptyBasemap(page);
+      await submitValidPlan(page);
+      await expectMapRegion(page);
+
+      await expect(page.getByRole('radio')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: /Show Route \d/ })).toHaveCount(3);
+      const overflow: number = await page.evaluate(
+        'document.documentElement.scrollWidth - window.innerWidth',
+      );
+      expect(overflow).toBeLessThanOrEqual(1);
+
+      await page.getByRole('button', { name: 'Show Route 2' }).click();
+      await expect(page.getByRole('button', { name: 'Selected on map' })).toHaveCount(1);
+    });
+  });
+}
