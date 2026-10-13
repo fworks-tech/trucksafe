@@ -1,5 +1,9 @@
 import { Box, IconButton, Tooltip } from '@mui/material';
-import { Add, CenterFocusStrong, Cloud, Layers, Remove } from '@mui/icons-material';
+import Add from '@mui/icons-material/Add';
+import CenterFocusStrong from '@mui/icons-material/CenterFocusStrong';
+import Cloud from '@mui/icons-material/Cloud';
+import Layers from '@mui/icons-material/Layers';
+import Remove from '@mui/icons-material/Remove';
 
 interface MapControlsProps {
   onRecenter: () => void;

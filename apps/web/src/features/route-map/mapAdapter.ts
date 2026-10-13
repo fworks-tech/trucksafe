@@ -61,9 +61,9 @@ export interface RouteMapCallbacks {
 }
 
 const LINE_COLORS: Record<RouteLineEntry['state'], string> = {
-  'recommended-selected': '#0d47a1',
-  recommended: '#0d47a1',
-  selected: '#0d47a1',
+  'recommended-selected': '#1c4666',
+  recommended: '#1c4666',
+  selected: '#1c4666',
   eligible: '#455a64',
   ineligible: '#9e9e9e',
   'no-travel': '#5c0a14',
@@ -357,7 +357,7 @@ export class RouteMapAdapter {
         type: 'line',
         source: ROUTES_SOURCE,
         paint: {
-          'line-color': '#0d47a1',
+          'line-color': '#1c4666',
           'line-width': 8,
           'line-opacity': 0.35,
         },
@@ -405,8 +405,8 @@ export class RouteMapAdapter {
         source: CHECKPOINTS_SOURCE,
         paint: {
           'circle-radius': 11,
-          'circle-color': 'rgba(13, 71, 161, 0.25)',
-          'circle-stroke-color': '#0d47a1',
+          'circle-color': 'rgba(28, 70, 102, 0.25)',
+          'circle-stroke-color': '#1c4666',
           'circle-stroke-width': 3,
         },
       });
@@ -522,14 +522,14 @@ export class RouteMapAdapter {
   }): void {
     for (const marker of this.markers) marker.remove();
     const created: Marker[] = [];
-    const origin = this.labeledMarker('Origin', '#0d47a1');
+    const origin = this.labeledMarker('Origin', '#1c4666');
     origin.setLngLat(markers.origin).addTo(this.map);
     created.push(origin);
     const destination = this.labeledMarker('Destination', '#1b5e20');
     destination.setLngLat(markers.destination).addTo(this.map);
     created.push(destination);
     if (markers.recommendedMidpoint !== null) {
-      const badge = this.labeledMarker('Recommended', '#0d47a1');
+      const badge = this.labeledMarker('Recommended', '#1c4666');
       badge.setLngLat(markers.recommendedMidpoint).addTo(this.map);
       created.push(badge);
     }

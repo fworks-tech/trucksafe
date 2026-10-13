@@ -54,7 +54,7 @@ class RoutePlanCreateView(APIView):
     """Create a route plan from origin, destination, departure, and load."""
 
     def post(self, request: Request) -> Response:
-        """Validate, plan with mock providers, persist, and return the plan."""
+        """Validate, plan with configured providers, persist, return the plan."""
         request_id = getattr(request, "request_id", uuid.uuid4().hex)
         try:
             serializer = RoutePlanRequestSerializer(data=request.data)

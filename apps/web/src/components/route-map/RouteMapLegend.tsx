@@ -1,4 +1,5 @@
-import { ExpandMore, TrendingDown } from '@mui/icons-material';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import TrendingDown from '@mui/icons-material/TrendingDown';
 import { Box, IconButton, Paper, Stack, Typography } from '@mui/material';
 import { useState } from 'react';
 
@@ -121,13 +122,13 @@ export function RouteMapLegend({
         >
           <Stack spacing={0.5}>
             <LineSwatch
-              color="#0d47a1"
+              color="#1c4666"
               width={5}
               dashed={false}
-              label="Recommended route (wider, solid blue)"
+              label="Recommended route (wider, solid navy)"
             />
             <LineSwatch
-              color="#0d47a1"
+              color="#1c4666"
               width={3}
               dashed={false}
               label="Selected route (highlighted)"

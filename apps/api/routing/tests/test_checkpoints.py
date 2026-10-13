@@ -457,3 +457,35 @@ def test_short_route_boundaries_sample_origin_and_destination(
     )
     assert checkpoints[0].eta == DEPARTURE
     assert checkpoints[-1].eta == DEPARTURE + timedelta(seconds=3600.0)
+
+
+def test_checkpoints_follow_a_bend_with_cumulative_distance() -> None:
+    """On an L-shaped route, checkpoints past the bend lie on the second
+    leg at cumulative (not straight-line) distances."""
+    deg = MILES_PER_DEGREE_LONGITUDE
+    bend_lon = 50.0 / deg
+    route = [
+        Coordinate(0.0, 0.0),
+        Coordinate(0.0, bend_lon / 2),
+        Coordinate(0.0, bend_lon),
+        Coordinate(25.0 / deg, bend_lon),
+        Coordinate(50.0 / deg, bend_lon),
+    ]
+    checkpoints = generate_checkpoints(
+        route,
+        interval_miles=25.0,
+        departure_at=DEPARTURE,
+        duration_seconds=7200.0,
+    )
+    assert [round(cp.distance_miles, 6) for cp in checkpoints] == [
+        0.0,
+        25.0,
+        50.0,
+        75.0,
+        100.0,
+    ]
+    past_bend = checkpoints[3]
+    assert past_bend.latitude == pytest.approx(25.0 / deg)
+    assert past_bend.longitude == pytest.approx(bend_lon)
+    assert checkpoints[2].latitude == pytest.approx(0.0)
+    assert checkpoints[2].longitude == pytest.approx(bend_lon)

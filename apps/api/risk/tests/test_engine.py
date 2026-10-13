@@ -177,3 +177,46 @@ def test_non_finite_load_weight_is_rejected(load_weight_lb: float) -> None:
             weather=make_clear_weather(),
             load_weight_lb=load_weight_lb,
         )
+
+
+def test_load_30_lb_does_not_trigger_45_mph_rule() -> None:
+    """Thirty pounds is a light load, not thirty thousand: the >30,000 lb
+    rule must not fire. Catches unit confusion between lb and thousands."""
+    result = calculate_risk(
+        weather=WeatherObservation(
+            wind_mph=45.0,
+            rain_inches_per_hour=0.0,
+            snow_inches_per_hour=0.0,
+        ),
+        load_weight_lb=30.0,
+    )
+
+    assert result.level == RiskLevel.SEVERE
+
+
+def test_load_30000_01_lb_triggers_45_mph_rule() -> None:
+    """The >30,000 lb boundary is exclusive: 30,000.01 activates it."""
+    result = calculate_risk(
+        weather=WeatherObservation(
+            wind_mph=45.0,
+            rain_inches_per_hour=0.0,
+            snow_inches_per_hour=0.0,
+        ),
+        load_weight_lb=30_000.01,
+    )
+
+    assert result.level == RiskLevel.NO_TRAVEL
+
+
+def test_load_40000_01_lb_triggers_35_mph_rule() -> None:
+    """The >40,000 lb boundary is exclusive: 40,000.01 activates it."""
+    result = calculate_risk(
+        weather=WeatherObservation(
+            wind_mph=35.0,
+            rain_inches_per_hour=0.0,
+            snow_inches_per_hour=0.0,
+        ),
+        load_weight_lb=40_000.01,
+    )
+
+    assert result.level == RiskLevel.SEVERE

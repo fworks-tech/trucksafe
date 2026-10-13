@@ -84,6 +84,10 @@ class PlannedRoutePlan:
         geometries: Provider geometries aligned with routes.
         recommendation: Deterministic ranking result.
         warnings: Human-readable degradation notes.
+        routing_provider: Diagnostic provider name (e.g. "mock", "osrm").
+        mock_mode: True when geometry is deterministic demonstration data,
+            not road-network routing. Never silently true in production:
+            it mirrors the configured provider.
     """
 
     plan_id: str
@@ -91,6 +95,14 @@ class PlannedRoutePlan:
     geometries: tuple[RouteGeometry, RouteGeometry, RouteGeometry]
     recommendation: RecommendationResult
     warnings: tuple[str, ...]
+    routing_provider: str
+    mock_mode: bool
+
+
+MOCK_GEOMETRY_WARNING = (
+    "mock routing provider in use: geometry is demonstration data, "
+    "not road-network routing"
+)
 
 
 def plan_id_for(
@@ -152,7 +164,13 @@ def plan_route_plan(
     # aggregate_routes preserves order; cast to the fixed three-route shape.
     three: tuple[Route, Route, Route] = (summarized[0], summarized[1], summarized[2])
     recommendation = recommend_route(three)
+    provider_name = getattr(
+        routing_provider, "provider_name", type(routing_provider).__name__
+    )
+    mock_mode = provider_name == "mock"
     warnings = _collect_warnings(three, recommendation)
+    if mock_mode:
+        warnings = (*warnings, MOCK_GEOMETRY_WARNING)
     return PlannedRoutePlan(
         plan_id=plan_id_for(
             origin, destination, departure_at, load_weight_lb, checkpoint_interval_miles
@@ -161,6 +179,8 @@ def plan_route_plan(
         geometries=geometries,
         recommendation=recommendation,
         warnings=warnings,
+        routing_provider=provider_name,
+        mock_mode=mock_mode,
     )
 
 

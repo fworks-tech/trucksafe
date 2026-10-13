@@ -85,3 +85,23 @@ test('has no critical accessibility violations on form and result states', async
   const resultResults = await new AxeBuilder({ page }).analyze();
   expect(resultResults.violations).toEqual([]);
 });
+
+test('flags demonstration geometry when the mock provider plans the trip', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await fillValidForm(page);
+  await page.getByRole('button', { name: /plan route/i }).click();
+
+  // The dev backend runs the mock provider, so the plan must say so.
+  await expect(page.getByText('Route alternatives (3)')).toBeVisible();
+  await expect(page.getByText(/Demonstration geometry/)).toBeVisible();
+});
+
+test('prefills origin, departure, and load weight in pounds', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByLabel(/origin/i)).toHaveValue('Chicago, IL');
+  await expect(page.getByLabel(/load weight/i)).toHaveValue('30000');
+  const departure = await page.getByLabel(/departure date and time/i).inputValue();
+  expect(departure).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+});

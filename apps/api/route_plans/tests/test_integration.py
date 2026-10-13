@@ -280,3 +280,17 @@ def test_invalid_request_id_on_success_is_replaced(
     header = response["X-Request-ID"]
     assert "\n" not in header
     assert header != "bad\nid"
+
+
+@pytest.mark.django_db
+def test_mock_plans_self_identify_provider_and_warning(
+    client: APIClient, payload: dict
+) -> None:
+    """The default mock plan marks its geometry source explicitly (Option B):
+    provider name, mock flag, and a visible warning. No silent fallback."""
+    response = client.post(URL, payload, format="json")
+    assert response.status_code == 201
+    body = response.json()
+    assert body["routing_provider"] == "mock"
+    assert body["mock_mode"] is True
+    assert any("mock routing provider" in warning for warning in body["warnings"])

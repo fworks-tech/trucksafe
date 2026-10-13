@@ -73,6 +73,8 @@ request repeats (same deterministic plan id, stored payload returned).
 {
   "id": "route-plan-id",
   "status": "completed",
+  "routing_provider": "mock",
+  "mock_mode": true,
   "recommended_route_id": "route-1",
   "recommendation_reason": {
     "code": "LOWEST_RISK_RANKING",
@@ -166,6 +168,13 @@ Response notes:
   backoff in this slice.
 - Routing, geocoding, and weather currently come from deterministic
   mock providers. Mock data must never be presented as live weather.
+- `routing_provider` names the adapter that produced the geometry
+  (`"mock"`, `"osrm"`, or a custom dotted path's `provider_name`).
+  `mock_mode` is `true` when the geometry is deterministic demonstration
+  data (straight corridors, not roads); the response then also carries a
+  `"mock routing provider in use"` warning, and clients must show a
+  visible banner. There is no silent fallback: when `osrm` is configured
+  and fails, the API returns `422`/`503` instead of mock geometry.
 
 ## Health
 

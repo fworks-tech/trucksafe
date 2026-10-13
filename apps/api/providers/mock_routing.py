@@ -100,7 +100,15 @@ def _clamp_latitude(latitude: float) -> float:
 
 
 class MockRoutingProvider:
-    """RoutingProvider returning three fixed deterministic routes."""
+    """RoutingProvider returning three fixed deterministic routes.
+
+    Variants are straight corridors (south, central, north) with a fixed
+    lateral offset: demonstration geometry, not road-network routing.
+    The response marks this mode explicitly so no client mistakes it
+    for real roads.
+    """
+
+    provider_name = "mock"
 
     def __init__(
         self,

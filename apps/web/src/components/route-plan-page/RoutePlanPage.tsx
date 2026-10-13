@@ -1,16 +1,8 @@
-import {
-  Alert,
-  Box,
-  Button,
-  CircularProgress,
-  Stack,
-  Tab,
-  Tabs,
-  Typography,
-} from '@mui/material';
+import { Alert, Box, Button, Stack, Tab, Tabs, Typography } from '@mui/material';
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useRoutePlanMutation } from '../../features/route-planning/hooks/useRoutePlan';
+import { useWeatherGrid } from '../../features/route-map/useWeatherGrid';
 import {
   DEFAULT_ORIGIN_CITY,
   lookupCityCoordinates,
@@ -22,6 +14,7 @@ import {
 import { RouteSidebar } from '../layout/RouteSidebar';
 import { RoutePlanForm } from '../route-planning-form/RoutePlanForm';
 import { OriginFocusMap } from '../route-map/OriginFocusMap';
+import { ForecastSection } from '../route-map/ForecastSection';
 import { RecommendationSummary } from '../route-card/RecommendationSummary';
 import { RequestStatus } from '../route-card/RequestStatus';
 import { RouteComparison } from '../route-card/RouteComparison';
@@ -50,6 +43,9 @@ export function RoutePlanPage(): React.JSX.Element {
   // from the backend recommendation; never stored server-side.
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'plan' | 'routes'>('plan');
+  // Dismissible mock-source notice (sidebar noise); it unmounts with
+  // the response on every submit, so dismissal resets per plan.
+  const [mockNoticeDismissed, setMockNoticeDismissed] = useState(false);
   // Origin city driving the pre-plan background map. Unknown free text
   // keeps the previous viewport (lookup returns null, center is unchanged).
   const [originCity, setOriginCity] = useState<string>(DEFAULT_ORIGIN_CITY);
@@ -111,6 +107,9 @@ export function RoutePlanPage(): React.JSX.Element {
 
   const error = mutation.error;
   const response = mutation.isSuccess ? mutation.data.data : null;
+  // Forecast grid state shared by the bottom-sheet slider and the map
+  // heatmap. Null before the first plan: idle, no requests.
+  const forecast = useWeatherGrid(response?.id ?? null);
   const requestId = mutation.isSuccess
     ? mutation.data.requestId
     : (error?.requestId ?? null);
@@ -146,6 +145,7 @@ export function RoutePlanPage(): React.JSX.Element {
               response={response}
               selectedRouteId={effectiveSelection}
               onSelectRoute={handleSelectRoute}
+              weatherGrid={forecast.weatherGrid}
             />
           </Suspense>
         ) : (
@@ -153,7 +153,38 @@ export function RoutePlanPage(): React.JSX.Element {
         )}
       </Box>
 
-      <RouteSidebar>
+      <RouteSidebar
+        header={
+          <Box sx={{ mt: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="h1" component="h1" sx={{ m: 0 }}>
+                <Box
+                  component="img"
+                  src="/logo-sidebar.png"
+                  alt="TruckSafe"
+                  sx={{ display: 'block', height: 48 }}
+                />
+              </Typography>
+            </Box>
+            <Tabs
+              value={activeTab}
+              onChange={(_event: React.SyntheticEvent, value: string) =>
+                setActiveTab(value as 'plan' | 'routes')
+              }
+              aria-label="Route planning steps"
+              variant="fullWidth"
+            >
+              <Tab id="tab-plan" label="Plan Trip" value="plan" />
+              <Tab
+                id="tab-routes"
+                label="Routes"
+                value="routes"
+                disabled={response === null}
+              />
+            </Tabs>
+          </Box>
+        }
+      >
         <Box
           sx={{
             display: 'flex',
@@ -162,48 +193,35 @@ export function RoutePlanPage(): React.JSX.Element {
             gap: 1,
             mb: 1,
           }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="h1" component="h1" sx={{ m: 0 }}>
-              <Box
-                component="img"
-                src="/logo-sidebar.png"
-                alt="TruckSafe"
-                sx={{ display: 'block', height: 48 }}
-              />
-            </Typography>
-          </Box>
-          {mutation.isPending && <CircularProgress size={20} aria-hidden="true" />}
-        </Box>
+        ></Box>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Plan a truck route and compare weather-risk alternatives. Results use
-          deterministic demonstration data, not live weather.
+          Plan a truck route and compare weather-risk alternatives. Forecast weather is
+          simulated, not live.
         </Typography>
 
-        <RequestStatus
-          state={state}
-          error={error}
-          routeCount={response?.routes.length ?? 0}
-        />
-
-        <Box sx={{ mt: 1 }}>
-          <Tabs
-            value={activeTab}
-            onChange={(_event: React.SyntheticEvent, value: string) =>
-              setActiveTab(value as 'plan' | 'routes')
-            }
-            aria-label="Route planning steps"
-            variant="fullWidth"
+        {response !== null && response.mock_mode && !mockNoticeDismissed && (
+          <Alert
+            severity="warning"
+            onClose={() => setMockNoticeDismissed(true)}
+            sx={{ mb: 2 }}
           >
-            <Tab id="tab-plan" label="Plan Trip" value="plan" />
-            <Tab
-              id="tab-routes"
-              label="Routes"
-              value="routes"
-              disabled={response === null}
+            Demonstration geometry — this plan uses the mock routing provider, not live
+            road data. Routes are straight corridors, and load rules still apply in
+            pounds.
+          </Alert>
+        )}
+
+        {
+          // Pending and error states have no response yet; only idle
+          // renders nothing (no reserved empty box).
+          state !== 'idle' && (
+            <RequestStatus
+              state={state}
+              error={error}
+              routeCount={response?.routes.length ?? 0}
             />
-          </Tabs>
-        </Box>
+          )
+        }
 
         <Box
           role="tabpanel"
@@ -261,6 +279,15 @@ export function RoutePlanPage(): React.JSX.Element {
                     recommendedRouteId={response.recommended_route_id}
                     selectedRouteId={effectiveSelection}
                     onSelectRoute={handleSelectRoute}
+                  />
+                  <ForecastSection
+                    value={forecast.forecastOffset}
+                    onChange={forecast.setForecastOffset}
+                    departureAt={
+                      response.routes[0]?.checkpoints[0]?.eta ?? new Date().toISOString()
+                    }
+                    loading={forecast.gridLoading}
+                    error={forecast.gridError}
                   />
                 </>
               )}

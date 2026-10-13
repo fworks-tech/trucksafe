@@ -11,7 +11,11 @@ backend allows.
 
 - Instance `i-08594a0ca88a818bb` (`t3.micro`, Amazon Linux 2023,
   `trucksafe-api` in `us-east-1a`), image
-  `026621559747.dkr.ecr.us-east-1.amazonaws.com/trucksafe-api:cors-1`.
+  `026621559747.dkr.ecr.us-east-1.amazonaws.com/trucksafe-api:routing-source-2`.
+- `TRUCKSAFE_ROUTING_PROVIDER=osrm`: road-following OSRM geometry
+  (verified live Chicago → Dallas: 3 routes, 9–12k coords each,
+  circuity ~1.2, `"mock_mode": false`). The enrichment cap is 50,000
+  points per route; denser polylines plan instead of failing.
 - Security group `sg-00889e65ca79422c1` allows TCP 8000 only (no SSH;
   management via SSM Session Manager).
 - CORS is enforced by `django-cors-headers`: exact origins via
@@ -22,6 +26,39 @@ backend allows.
   `POST /api/v1/route-plans` Chicago → Houston returns 3 routes with a
   deterministic recommendation; preflight from a `vercel.app` origin is
   echoed, other origins are not.
+- Routing mode on the demo is the road-following **OSRM** provider
+  (`TRUCKSAFE_ROUTING_PROVIDER=osrm`). Every response carries
+  `"routing_provider"` / `"mock_mode"` so a future mock fallback would
+  be explicit, and the frontend renders a "Demonstration geometry"
+  banner whenever `mock_mode` is true.
+
+## Production routing (road network)
+
+Set `TRUCKSAFE_ROUTING_PROVIDER=osrm` in the backend environment and
+restart the container to serve road-following geometry: OSRM
+`driving` profile with `overview=full&geometries=geojson` plus up to 3
+alternatives (via-point re-routing pads to three when OSRM returns
+fewer). No credentials; needs outbound internet to
+`router.project-osrm.org` (geocoding via `photon.komoot.io`).
+
+- Geometry contract: GeoJSON `LineString`, WGS84 `[lon, lat]`, full
+  provider polyline (no straight-line substitution anywhere —
+  checkpoints use cumulative route distance, the frontend renders the
+  polyline verbatim). The adapter rejects malformed shapes
+  (non-finite/out-of-range coordinates, swapped axis order, totals that
+  disagree with the polyline) and surfaces them as `422`/`503`, never
+  as silent mock geometry.
+- Failure behavior: no silent fallback exists. OSRM errors propagate as
+  the documented `422`/`503` envelopes after 3 transient-only attempts
+  (8 s timeout per attempt).
+- Truck limitation: the public OSRM demo server runs a **car profile**
+  with no truck restrictions (height, weight, hazmat, truck-prohibited
+  roads). Treat road geometry as corridor-accurate but not
+  truck-legal; a truck-aware profile is a follow-up, not this slice.
+- Load weight stays in **pounds** end to end (`load_weight_lb`):
+  the form defaults to `30000` with a `30000` example placeholder, and
+  the `>30,000` / `>40,000` rules compare exclusive boundaries
+  (`30000` does not trigger, `30000.01` does).
 - App Runner was attempted first but the account's free plan cannot
   subscribe to it (`SubscriptionRequiredException`); EC2 + CloudFront
   is the fallback.
