@@ -218,11 +218,13 @@ export function RoutePlanPage(): React.JSX.Element {
         )}
 
         {
-          response !== null && state !== 'idle' && (
+          // Pending and error states have no response yet; only idle
+          // renders nothing (no reserved empty box).
+          state !== 'idle' && (
             <RequestStatus
               state={state}
               error={error}
-              routeCount={response.routes.length}
+              routeCount={response?.routes.length ?? 0}
             />
           )
         }
