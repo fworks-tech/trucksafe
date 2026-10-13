@@ -149,6 +149,24 @@ describe('RecommendationSummary', () => {
     expect(screen.getByText(/no eligible route available/i)).toBeInTheDocument();
     expect(screen.queryByText(/Recommended:/)).not.toBeInTheDocument();
   });
+
+  it('dismisses the recommendation card on close', async () => {
+    const user = userEvent.setup();
+    const plan = makeRoutePlan();
+    renderWithProviders(<RecommendationSummary response={plan} requestId="req-1" />);
+    await user.click(
+      screen.getByRole('button', { name: 'Dismiss recommendation' }),
+    );
+    expect(screen.queryByText('Recommended: Route 1')).not.toBeInTheDocument();
+  });
+
+  it('dismisses the no-eligible-route note on close', async () => {
+    const user = userEvent.setup();
+    const plan = makeAllIneligiblePlan();
+    renderWithProviders(<RecommendationSummary response={plan} requestId={null} />);
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByText(/no eligible route available/i)).not.toBeInTheDocument();
+  });
 });
 
 describe('CheckpointList', () => {
@@ -206,5 +224,14 @@ describe('WarningList', () => {
     unmount();
     const empty = renderWithProviders(<WarningList warnings={[]} />);
     expect(empty.container).toBeEmptyDOMElement();
+  });
+
+  it('dismisses the warnings on close', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <WarningList warnings={['route-3 ineligible: no-travel segments present']} />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByText(/no-travel segments present/)).not.toBeInTheDocument();
   });
 });

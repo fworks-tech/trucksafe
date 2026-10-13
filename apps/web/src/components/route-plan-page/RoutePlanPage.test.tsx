@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -221,6 +221,27 @@ describe('RoutePlanPage map integration', () => {
       await fillAndSubmit();
       await screen.findByText('Route alternatives (3)');
       expect(screen.getByText(/Demonstration geometry/)).toBeVisible();
+    },
+  );
+
+  it(
+    'dismisses the demonstration notice while keeping the routes',
+    { timeout: 15000 },
+    async () => {
+      setScenario('mockSuccess');
+      const user = userEvent.setup();
+      renderWithProviders(<RoutePlanPage />);
+      await fillAndSubmit();
+      await screen.findByText('Route alternatives (3)');
+      const banner = screen
+        .getByText(/Demonstration geometry/)
+        .closest('[role="alert"]');
+      expect(banner).not.toBeNull();
+      await user.click(
+        within(banner as HTMLElement).getByRole('button', { name: 'Close' }),
+      );
+      expect(screen.queryByText(/Demonstration geometry/)).not.toBeInTheDocument();
+      expect(screen.getByText('Route alternatives (3)')).toBeInTheDocument();
     },
   );
 });

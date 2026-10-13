@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -56,5 +57,12 @@ describe('RequestStatus', () => {
 
     renderWithProviders(<RequestStatus state="success" routeCount={3} />);
     expect(screen.getByText(/route plan ready with 3 alternatives/i)).toBeInTheDocument();
+  });
+
+  it('dismisses the success note on close', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<RequestStatus state="success" routeCount={3} />);
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByText(/route plan ready/i)).not.toBeInTheDocument();
   });
 });
