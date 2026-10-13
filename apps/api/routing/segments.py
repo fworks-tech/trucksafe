@@ -28,7 +28,10 @@ from .checkpoints import (
 )
 from .domain import RiskAssessment  # noqa: F401  # re-exported for convenience
 
-MAX_GEOMETRY_POINTS = 10_000
+MAX_GEOMETRY_POINTS = 50_000
+# Sized for real road polylines: OSRM full-overview geometry runs ~10
+# points per mile, so a 3,000-mile route plus checkpoint vertices stays
+# well under the cap while pathological payloads are still rejected.
 MAX_SEGMENTS = 1_000
 MAX_REASON_LENGTH = 200
 

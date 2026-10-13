@@ -313,3 +313,37 @@ def test_service_marks_real_provider_without_mock_warning() -> None:
     assert result.routing_provider == "osrm"
     assert result.mock_mode is False
     assert MOCK_GEOMETRY_WARNING not in result.warnings
+
+
+def test_service_plans_dense_provider_geometry() -> None:
+    """Real road polylines (10k+ points) must plan, not fail validation."""
+    start = Coordinate(latitude=41.8781, longitude=-87.6298)
+    end = Coordinate(latitude=32.7767, longitude=-96.7970)
+    count = 12_500
+    points = tuple(
+        Coordinate(
+            latitude=start.latitude
+            + (end.latitude - start.latitude) * index / (count - 1),
+            longitude=start.longitude
+            + (end.longitude - start.longitude) * index / (count - 1),
+        )
+        for index in range(count)
+    )
+    geometry = RouteGeometry(
+        points=points, distance_miles=950.0, duration_seconds=60000.0
+    )
+
+    class DenseStub(MockRoutingProvider):
+        provider_name = "osrm"
+
+        def plan_routes(
+            self, request: RoutePlanRequest
+        ) -> tuple[RouteGeometry, RouteGeometry, RouteGeometry]:
+            """Return the dense geometry regardless of the request."""
+            self.calls += 1
+            return (geometry, geometry, geometry)
+
+    result = plan(routing_provider=DenseStub())
+    assert result.mock_mode is False
+    assert len(result.routes) == 3
+    assert all(len(route.checkpoints) > 0 for route in result.routes)
