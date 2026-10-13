@@ -55,13 +55,13 @@ export function RoutePlanForm({
     formState: { errors },
   } = useForm<RoutePlanFormValues>({
     resolver: zodResolver(routePlanFormSchema),
-    // Sensible starting point: Chicago today with a light load; the user
-    // only needs a destination to plan.
+    // Sensible starting point: Chicago today with a typical loaded
+    // weight in pounds; the user only needs a destination to plan.
     defaultValues: {
       origin: DEFAULT_ORIGIN_CITY,
       destination: '',
       departure: toLocalInputValue(new Date()),
-      loadWeight: 30,
+      loadWeight: 30000,
       checkpointInterval: 25,
     },
   });
@@ -206,7 +206,7 @@ export function RoutePlanForm({
           disabled={isPending}
           error={errors.loadWeight !== undefined}
           helperText={errors.loadWeight?.message}
-          slotProps={{ htmlInput: { min: 0, step: 'any' } }}
+          slotProps={{ htmlInput: { min: 0, step: 'any', placeholder: '30000' } }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">

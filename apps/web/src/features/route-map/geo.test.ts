@@ -423,3 +423,67 @@ describe('risk_segments normalization', () => {
     expect(result.segments['route-1']).toBeUndefined();
   });
 });
+
+describe('provider geometry fidelity', () => {
+  it('passes dense road-network geometry through unchanged', () => {
+    const coordinates: [number, number][] = [
+      [-87.6298, 41.8781],
+      [-87.9, 41.7],
+      [-88.3, 41.5],
+      [-88.8, 41.2],
+      [-89.4, 40.9],
+      [-90.0, 40.5],
+      [-90.8, 40.0],
+      [-91.5, 39.4],
+    ];
+    const geometry = normalizeRouteGeometry({ type: 'LineString', coordinates });
+    // No interpolation, reordering, or thinning: the map draws exactly
+    // what the provider returned.
+    expect(geometry?.coordinates).toEqual(coordinates);
+  });
+
+  it('keeps all three provider lines with their own coordinates', () => {
+    const plan = makeRoutePlan({
+      routes: [
+        makeRoute('route-1', {
+          recommended: true,
+          rank: 1,
+          coordinates: [
+            [-87.63, 41.88],
+            [-87.3, 41.4],
+            [-87.0, 41.0],
+          ],
+        }),
+        makeRoute('route-2', {
+          rank: 2,
+          coordinates: [
+            [-87.63, 41.88],
+            [-88.0, 41.2],
+            [-87.0, 41.0],
+          ],
+        }),
+        makeRoute('route-3', {
+          rank: 3,
+          coordinates: [
+            [-87.63, 41.88],
+            [-87.5, 41.6],
+            [-87.0, 41.0],
+          ],
+        }),
+      ],
+    });
+    const model = normalizePlanMap(plan, {
+      selectedRouteId: null,
+      recommendedRouteId: plan.recommended_route_id,
+    });
+    expect(model.lines).toHaveLength(3);
+    for (const line of model.lines) {
+      const source = plan.routes.find((route) => route.id === line.routeId);
+      // Each line draws its own route's coordinates verbatim: no
+      // straight-line substitution, no cross-route mixing.
+      expect(line.coordinates).toEqual(source?.geometry?.coordinates);
+    }
+    const distinct = new Set(model.lines.map((line) => JSON.stringify(line.coordinates)));
+    expect(distinct.size).toBe(3);
+  });
+});

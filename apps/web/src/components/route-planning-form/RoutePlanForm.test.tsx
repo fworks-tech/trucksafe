@@ -36,7 +36,7 @@ describe('RoutePlanForm city autocomplete', () => {
     expect(screen.getByLabelText(/^origin/i)).toHaveValue('Phoenix, AZ');
     await user.clear(screen.getByLabelText(/^destination/i));
     await user.type(screen.getByLabelText(/^destination/i), 'Miami, FL');
-    // Departure and load ship prefilled (today, 30 lb); clear before typing.
+    // Departure and load ship prefilled (today, 30,000 lb); clear before typing.
     await user.clear(screen.getByLabelText(/departure date and time/i));
     await user.type(
       screen.getByLabelText(/departure date and time/i),
@@ -53,7 +53,7 @@ describe('RoutePlanForm city autocomplete', () => {
       <RoutePlanForm onSubmit={() => {}} isPending={false} onCancel={() => {}} />,
     );
     expect(screen.getByLabelText(/^origin/i)).toHaveValue('Chicago, IL');
-    expect(screen.getByLabelText(/load weight/i)).toHaveValue(30);
+    expect(screen.getByLabelText(/load weight/i)).toHaveValue(30000);
     const departure = (
       screen.getByLabelText(/departure date and time/i) as HTMLInputElement
     ).value;

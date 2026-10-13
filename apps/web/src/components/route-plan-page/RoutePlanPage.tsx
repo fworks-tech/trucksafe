@@ -180,6 +180,14 @@ export function RoutePlanPage(): React.JSX.Element {
           deterministic demonstration data, not live weather.
         </Typography>
 
+        {response !== null && response.mock_mode && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Demonstration geometry — this plan uses the mock routing provider, not live
+            road data. Routes are straight corridors, and load rules still apply in
+            pounds.
+          </Alert>
+        )}
+
         <RequestStatus
           state={state}
           error={error}

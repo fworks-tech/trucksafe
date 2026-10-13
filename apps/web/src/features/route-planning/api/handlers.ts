@@ -16,6 +16,7 @@ import {
 
 export type Scenario =
   | 'success'
+  | 'mockSuccess'
   | 'allIneligible'
   | 'minimal'
   | 'badRequest'
@@ -86,6 +87,17 @@ export function routePlansHandler(
           status: 201,
           headers: { 'X-Request-ID': incomingId },
         });
+      case 'mockSuccess':
+        return HttpResponse.json(
+          makeRoutePlan({
+            routingProvider: 'mock',
+            mockMode: true,
+            warnings: [
+              'mock routing provider in use: geometry is demonstration data, not road-network routing',
+            ],
+          }),
+          { status: 201, headers: { 'X-Request-ID': incomingId } },
+        );
       case 'allIneligible':
         return HttpResponse.json(makeAllIneligiblePlan(), {
           status: 201,
@@ -139,14 +151,12 @@ export function routePlansHandler(
         );
       case 'empty':
         return HttpResponse.json(
-          {
-            id: 'plan-empty',
-            status: 'completed',
-            recommended_route_id: null,
-            recommendation_reason: null,
-            warnings: [],
+          makeRoutePlan({
+            planId: 'plan-empty',
             routes: [],
-          },
+            recommendedRouteId: null,
+            reason: null,
+          }),
           { status: 201, headers: { 'X-Request-ID': incomingId } },
         );
       case 'networkError':

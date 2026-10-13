@@ -63,6 +63,7 @@ export interface RouteOverrides {
   averageRiskScore?: number;
   checkpoints?: CheckpointPayload[];
   geometryNull?: boolean;
+  coordinates?: [number, number][];
   riskSegments?: RiskSegmentPayload[];
 }
 
@@ -97,6 +98,7 @@ export function makeRoute(id: string, overrides: RouteOverrides = {}): RoutePayl
     averageRiskScore = 1,
     geometryNull = false,
     riskSegments,
+    coordinates,
   } = overrides;
   const checkpoints = overrides.checkpoints ?? [
     makeCheckpoint({ distanceMiles: 0 }),
@@ -118,7 +120,7 @@ export function makeRoute(id: string, overrides: RouteOverrides = {}): RoutePayl
       ? null
       : {
           type: 'LineString',
-          coordinates: [
+          coordinates: coordinates ?? [
             [-87.63, 41.88],
             [-87.3, 41.4],
             [-87.0, 41.0],
@@ -142,6 +144,8 @@ export interface PlanOverrides {
   reason?: RecommendationReasonPayload | null;
   warnings?: string[];
   planId?: string;
+  routingProvider?: string;
+  mockMode?: boolean;
 }
 
 /** Successful plan: exactly three routes, first one recommended. */
@@ -154,6 +158,8 @@ export function makeRoutePlan(overrides: PlanOverrides = {}): RoutePlanResponse 
   return {
     id: overrides.planId ?? 'plan-test-001',
     status: 'completed',
+    routing_provider: overrides.routingProvider ?? 'osrm',
+    mock_mode: overrides.mockMode ?? false,
     recommended_route_id:
       overrides.recommendedRouteId === undefined
         ? 'route-1'

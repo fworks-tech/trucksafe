@@ -78,6 +78,10 @@ export interface RecommendationReasonPayload {
 export interface RoutePlanResponse {
   id: string;
   status: string;
+  /** Diagnostic provider name (e.g. "mock", "osrm"). */
+  routing_provider: string;
+  /** True when geometry is demonstration data, not road-network routing. */
+  mock_mode: boolean;
   recommended_route_id: string | null;
   recommendation_reason: RecommendationReasonPayload | null;
   warnings: string[];

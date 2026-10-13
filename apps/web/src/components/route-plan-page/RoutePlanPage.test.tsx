@@ -214,4 +214,16 @@ describe('RoutePlanPage map integration', () => {
       expect(screen.getByRole('radio', { name: /route 1.*recommended/i })).toBeChecked();
     },
   );
+
+  it(
+    'warns visibly when the plan uses demonstration (mock) geometry',
+    { timeout: 15000 },
+    async () => {
+      setScenario('mockSuccess');
+      renderWithProviders(<RoutePlanPage />);
+      await fillAndSubmit();
+      await screen.findByText('Route alternatives (3)');
+      expect(screen.getByText(/Demonstration geometry/)).toBeVisible();
+    },
+  );
 });

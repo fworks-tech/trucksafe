@@ -83,6 +83,8 @@ const recommendationReasonSchema = z.object({
 const responseSchema = z.object({
   id: z.string(),
   status: z.string(),
+  routing_provider: z.string().catch('unknown'),
+  mock_mode: z.boolean().catch(false),
   recommended_route_id: z.string().nullable(),
   recommendation_reason: recommendationReasonSchema.nullable(),
   warnings: z.array(z.string()).catch([]),
