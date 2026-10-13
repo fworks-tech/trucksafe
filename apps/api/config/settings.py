@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Final
 
+from corsheaders.defaults import default_headers as cors_default_headers
 from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -80,6 +81,23 @@ SECRET_KEY: str = _resolve_secret_key(
 
 ALLOWED_HOSTS: list[str] = _parse_allowed_hosts(os.environ.get("ALLOWED_HOSTS"))
 
+# CORS. Empty by default (same-origin only; browsers block cross-origin
+# reads). Set CORS_ALLOWED_ORIGINS to a comma-separated list of exact
+# origins (e.g. "https://trucksafe.vercel.app") and/or
+# CORS_ALLOWED_ORIGIN_REGEXES to comma-separated regexes (e.g.
+# "https://[a-z0-9-]+\\.vercel\\.app" for Vercel preview deployments).
+# Both use the same tolerant parser as ALLOWED_HOSTS.
+CORS_ALLOWED_ORIGINS: list[str] = _parse_allowed_hosts(
+    os.environ.get("CORS_ALLOWED_ORIGINS")
+)
+CORS_ALLOWED_ORIGIN_REGEXES: list[str] = _parse_allowed_hosts(
+    os.environ.get("CORS_ALLOWED_ORIGIN_REGEXES")
+)
+
+# The frontend sends X-Request-ID for tracing; it must be exposed to the
+# browser on top of the django-cors-headers defaults, or preflights fail.
+CORS_ALLOW_HEADERS: list[str] = [*cors_default_headers, "x-request-id"]
+
 # Provider selection. ``osrm`` resolves to the road-following OSRM/Photon
 # adapter (no credentials); a dotted path selects any custom adapter;
 # unset keeps the deterministic mocks. The factory instantiates whatever
@@ -110,6 +128,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # Third-party applications
+    "corsheaders",
     "rest_framework",
     # Local applications
     "health.apps.HealthConfig",
@@ -120,6 +139,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # CORS headers must be added before CommonMiddleware serves the
+    # response (including 304s and preflight short-circuits).
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",

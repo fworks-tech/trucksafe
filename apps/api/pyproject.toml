@@ -9,7 +9,13 @@ version = "0.1.0"
 description = "Django API for weather-aware truck routing."
 requires-python = ">=3.11"
 
-dependencies = ["Django>=4.2,<5.0", "djangorestframework>=3.15,<4.0"]
+dependencies = [
+    "Django>=4.2,<5.0",
+    "djangorestframework>=3.15,<4.0",
+    "django-cors-headers>=4.3,<5.0",
+    # Production WSGI server used by apps/api/Dockerfile (App Runner).
+    "gunicorn>=21,<24",
+]
 
 
 [project.optional-dependencies]

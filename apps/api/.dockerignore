@@ -1,0 +1,12 @@
+# Keep caches, local state, and dev artifacts out of the image context.
+__pycache__/
+*.py[cod]
+*.sqlite3
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.pytest_cache/
+.coverage*
+htmlcov/
+.venv/
+venv/

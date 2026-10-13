@@ -1,0 +1,5 @@
+# Normalize line endings to LF on checkout everywhere (Windows, macOS,
+# Linux, and Docker build contexts). Without this, Windows checkouts with
+# `core.autocrlf=true` produce CRLF working-tree files that fail
+# `prettier --check` even though CI (LF checkouts) passes.
+* text=auto eol=lf

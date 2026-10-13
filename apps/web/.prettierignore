@@ -1,0 +1,9 @@
+# Build, cache, and report artifacts are machine-generated and must not
+# be format-checked. (CI runs on a fresh checkout where these do not
+# exist; without this file any local `npm run dev`/`build`/test run makes
+# `npm run format:check` fail on files no human wrote.)
+dist/
+coverage/
+.vite/
+test-results/
+playwright-report/

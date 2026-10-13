@@ -1,12 +1,36 @@
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vitest/config';
+import { defineConfig, type Plugin } from 'vitest/config';
 
 // Backend base URL for the dev proxy target. The dev server proxies
 // `/api/*` to the Django backend; production must serve same-origin.
 const backendOrigin = 'http://localhost:8000';
 
+// maplibre-gl resolves its web worker at runtime as
+// `./maplibre-gl-worker.mjs` relative to its own chunk, but Rollup cannot
+// statically trace that filename (chosen via ternary), so production
+// builds 404 the worker and the map never renders. Emit the self-contained
+// worker file next to the chunk instead (no new dependency).
+function maplibreWorkerPlugin(): Plugin {
+  const require = createRequire(import.meta.url);
+  return {
+    name: 'maplibre-worker',
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'assets/maplibre-gl-worker.mjs',
+        source: readFileSync(
+          require.resolve('maplibre-gl/dist/maplibre-gl-worker.mjs'),
+          'utf8',
+        ),
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), maplibreWorkerPlugin()],
   // maplibre-gl ships a web worker (`maplibre-gl-worker.mjs`) that the
   // dependency optimizer cannot pre-bundle; serve it unbundled in dev.
   optimizeDeps: {

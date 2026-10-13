@@ -95,3 +95,64 @@ def test_secret_key_fails_fast_outside_debug_mode(raw: str | None) -> None:
     """
     with pytest.raises(ImproperlyConfigured, match="DJANGO_SECRET_KEY"):
         _resolve_secret_key(debug=False, raw=raw)
+
+
+def test_cors_middleware_is_installed_before_common_middleware() -> None:
+    """
+    Preflight and regular responses need CORS headers even when
+    CommonMiddleware short-circuits, so corsheaders must run first.
+    """
+    from django.conf import settings as django_settings
+
+    middleware = list(django_settings.MIDDLEWARE)
+    assert "corsheaders" in django_settings.INSTALLED_APPS
+    assert middleware.index("corsheaders.middleware.CorsMiddleware") < middleware.index(
+        "django.middleware.common.CommonMiddleware"
+    )
+
+
+def test_preflight_returns_allow_origin_for_listed_origin() -> None:
+    """
+    A Vercel-style origin on the allowlist gets an ACAO echo on preflight.
+    """
+    from django.test import Client, override_settings
+
+    with override_settings(CORS_ALLOWED_ORIGINS=["https://trucksafe.vercel.app"]):
+        response = Client().options(
+            "/api/v1/health",
+            HTTP_ORIGIN="https://trucksafe.vercel.app",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="GET",
+        )
+    assert response["Access-Control-Allow-Origin"] == "https://trucksafe.vercel.app"
+
+
+def test_preflight_omits_allow_origin_for_unlisted_origin() -> None:
+    """
+    Origins outside the allowlist get no CORS headers (browser blocks).
+    """
+    from django.test import Client, override_settings
+
+    with override_settings(CORS_ALLOWED_ORIGINS=[]):
+        response = Client().options(
+            "/api/v1/health",
+            HTTP_ORIGIN="https://evil.example",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="GET",
+        )
+    assert "Access-Control-Allow-Origin" not in response
+
+
+def test_preflight_allows_request_id_header() -> None:
+    """
+    The frontend traces requests with X-Request-ID; preflight must allow it.
+    """
+    from django.test import Client, override_settings
+
+    with override_settings(CORS_ALLOWED_ORIGINS=["https://trucksafe.flabs.tech"]):
+        response = Client().options(
+            "/api/v1/route-plans",
+            HTTP_ORIGIN="https://trucksafe.flabs.tech",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS="content-type, x-request-id",
+        )
+    assert response["Access-Control-Allow-Origin"] == "https://trucksafe.flabs.tech"
+    assert "x-request-id" in response["Access-Control-Allow-Headers"].lower()

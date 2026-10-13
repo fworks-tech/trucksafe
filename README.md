@@ -72,7 +72,8 @@ Run the backend suite with `python -m pytest` from `apps/api` (see Testing Strat
   adapter; weather is mock-only)
 - `GET` route-plan retrieval endpoint
 - PostgreSQL/PostGIS persistence, Redis caching, Celery tasks
-- Docker, Docker Compose, CD workflows (CI runs backend, web, and e2e checks)
+- Backend Dockerfile (`apps/api/Dockerfile`, App Runner-ready); Docker
+  Compose and CD workflows still planned (CI runs backend, web, and e2e checks)
 - API contract tests
 
 Routing and weather run on deterministic mock providers by default and
@@ -179,7 +180,7 @@ client. See `apps/web/README.md` for setup and scope.
   │   │   └── tests/
 │   │   ├── manage.py
 │   │   ├── pyproject.toml
-│   │   └── Dockerfile              # Placeholder, not yet configured
+│   │   └── Dockerfile              # Production image (App Runner-ready)
   │   └── web/                        # React frontend (first slice implemented)
 ├── docs/                           # Architecture and technical documents
 ├── specs/                          # Feature specifications
