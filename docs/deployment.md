@@ -11,7 +11,11 @@ backend allows.
 
 - Instance `i-08594a0ca88a818bb` (`t3.micro`, Amazon Linux 2023,
   `trucksafe-api` in `us-east-1a`), image
-  `026621559747.dkr.ecr.us-east-1.amazonaws.com/trucksafe-api:cors-1`.
+  `026621559747.dkr.ecr.us-east-1.amazonaws.com/trucksafe-api:routing-source-2`.
+- `TRUCKSAFE_ROUTING_PROVIDER=osrm`: road-following OSRM geometry
+  (verified live Chicago → Dallas: 3 routes, 9–12k coords each,
+  circuity ~1.2, `"mock_mode": false`). The enrichment cap is 50,000
+  points per route; denser polylines plan instead of failing.
 - Security group `sg-00889e65ca79422c1` allows TCP 8000 only (no SSH;
   management via SSM Session Manager).
 - CORS is enforced by `django-cors-headers`: exact origins via
@@ -22,12 +26,11 @@ backend allows.
   `POST /api/v1/route-plans` Chicago → Houston returns 3 routes with a
   deterministic recommendation; preflight from a `vercel.app` origin is
   echoed, other origins are not.
-- Routing mode on the demo is the deterministic **mock** provider
-  (`TRUCKSAFE_ROUTING_PROVIDER` unset): geometry is straight corridors
-  (route polyline ≈ great-circle distance, circuity ≈ 1.00), and every
-  response self-identifies with `"routing_provider": "mock"`,
-  `"mock_mode": true`, plus a warning the frontend renders as a
-  "Demonstration geometry" banner.
+- Routing mode on the demo is the road-following **OSRM** provider
+  (`TRUCKSAFE_ROUTING_PROVIDER=osrm`). Every response carries
+  `"routing_provider"` / `"mock_mode"` so a future mock fallback would
+  be explicit, and the frontend renders a "Demonstration geometry"
+  banner whenever `mock_mode` is true.
 
 ## Production routing (road network)
 
