@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseLocalParts, toUtcIso } from './datetime';
+import { parseLocalParts, toLocalInputValue, toUtcIso } from './datetime';
 
 describe('parseLocalParts', () => {
   it('parses a well-formed datetime-local value', () => {
@@ -66,5 +66,24 @@ describe('toUtcIso', () => {
       expect(out).toMatch(/Z$/);
       expect(Number.isNaN(new Date(out).getTime())).toBe(false);
     }
+  });
+});
+
+describe('toLocalInputValue', () => {
+  it('formats a date as a datetime-local value that round-trips', () => {
+    const value = toLocalInputValue(new Date(2026, 9, 12, 14, 30, 45));
+    expect(value).toBe('2026-10-12T14:30');
+    expect(parseLocalParts(value)).toEqual({
+      year: 2026,
+      month: 10,
+      day: 12,
+      hour: 14,
+      minute: 30,
+    });
+    expect(toUtcIso(value)).toMatch(/Z$/);
+  });
+
+  it('zero-pads single-digit components', () => {
+    expect(toLocalInputValue(new Date(2026, 0, 5, 8, 7))).toBe('2026-01-05T08:07');
   });
 });

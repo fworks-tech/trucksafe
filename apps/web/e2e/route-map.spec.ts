@@ -142,14 +142,27 @@ test('falls back safely when the map style fails', async ({ page }) => {
   await expect(page.getByText('The interactive map could not be loaded')).toBeVisible();
 });
 
-test('removes the previous map when a new plan starts', async ({ page }) => {
+test('shows the origin map on load and keeps it when a new plan starts', async ({
+  page,
+}) => {
   await withEmptyBasemap(page);
+  await page.goto('/');
+  // The background map renders before any plan, centered on the
+  // default origin (Chicago, IL).
+  await expect(page.getByRole('region', { name: /showing chicago, il/i })).toBeVisible({
+    timeout: 20000,
+  });
+
   await submitValidPlan(page);
   await expectMapRegion(page);
 
+  // Starting over clears results but never removes the map itself: it
+  // falls back to the origin focus instead of a placeholder.
   await page.getByRole('button', { name: /start new plan/i }).click();
-  await expect(page.getByRole('region', { name: /interactive route map/i })).toBeHidden();
   await expect(page.getByRole('radio')).toHaveCount(0);
+  await expect(
+    page.getByRole('region', { name: /interactive route map/i }),
+  ).toBeVisible();
 });
 
 test('updates the displayed forecast when the slider moves', async ({ page }) => {

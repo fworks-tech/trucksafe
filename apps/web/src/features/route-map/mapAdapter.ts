@@ -568,6 +568,11 @@ export class RouteMapAdapter {
     if (this.lastBounds !== null) this.fitToBounds(this.lastBounds);
   }
 
+  /** Jump the viewport to a point (pre-plan origin focus); instant. */
+  focus(center: LngLat, zoom: number): void {
+    this.map.jumpTo({ center, zoom });
+  }
+
   /** Step zoom in/out for touch users without pinch gestures. */
   zoomBy(direction: 'in' | 'out'): void {
     if (direction === 'in') this.map.zoomIn();

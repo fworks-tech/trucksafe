@@ -1,24 +1,27 @@
-import { AltRoute } from '@mui/icons-material';
 import {
   Alert,
   Box,
   Button,
   CircularProgress,
-  Paper,
   Stack,
   Tab,
   Tabs,
   Typography,
 } from '@mui/material';
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useRoutePlanMutation } from '../../features/route-planning/hooks/useRoutePlan';
+import {
+  DEFAULT_ORIGIN_CITY,
+  lookupCityCoordinates,
+} from '../../features/route-planning/cities';
 import {
   normalizeFormValues,
   type RoutePlanFormValues,
 } from '../../features/route-planning/schemas';
 import { RouteSidebar } from '../layout/RouteSidebar';
 import { RoutePlanForm } from '../route-planning-form/RoutePlanForm';
+import { OriginFocusMap } from '../route-map/OriginFocusMap';
 import { RecommendationSummary } from '../route-card/RecommendationSummary';
 import { RequestStatus } from '../route-card/RequestStatus';
 import { RouteComparison } from '../route-card/RouteComparison';
@@ -34,36 +37,6 @@ const mapChunk = (): Promise<{
   }));
 const RouteMapSection = lazy(mapChunk);
 
-/** Full-viewport map placeholder shown before any plan exists. */
-function MapIdlePanel(): React.JSX.Element {
-  return (
-    <Box
-      sx={{
-        position: 'absolute',
-        inset: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        bgcolor: 'background.default',
-      }}
-    >
-      <Paper
-        variant="outlined"
-        sx={{ maxWidth: 420, mx: 2, p: 3, borderRadius: 3, textAlign: 'center' }}
-      >
-        <AltRoute sx={{ fontSize: 40, color: 'primary.main' }} aria-hidden="true" />
-        <Typography variant="h2" component="h2" gutterBottom sx={{ mt: 1 }}>
-          Map preview
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Plan a trip to see routes, checkpoints, segment risk, and the weather-risk
-          heatmap here. Every result also stays available as text in the planning panel.
-        </Typography>
-      </Paper>
-    </Box>
-  );
-}
-
 /**
  * Map-first route-planning workflow: a full-viewport map with a floating
  * planning sidebar (bottom sheet on small screens).
@@ -77,6 +50,13 @@ export function RoutePlanPage(): React.JSX.Element {
   // from the backend recommendation; never stored server-side.
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'plan' | 'routes'>('plan');
+  // Origin city driving the pre-plan background map. Unknown free text
+  // keeps the previous viewport (lookup returns null, center is unchanged).
+  const [originCity, setOriginCity] = useState<string>(DEFAULT_ORIGIN_CITY);
+  // Memoized by city name so unrelated re-renders keep a stable
+  // reference and never refire the map-focus effect (which would snap
+  // back a manually panned viewport).
+  const focusCenter = useMemo(() => lookupCityCoordinates(originCity), [originCity]);
 
   useEffect(() => {
     return (): void => {
@@ -169,7 +149,7 @@ export function RoutePlanPage(): React.JSX.Element {
             />
           </Suspense>
         ) : (
-          <MapIdlePanel />
+          <OriginFocusMap center={focusCenter} cityName={originCity} />
         )}
       </Box>
 
@@ -184,9 +164,13 @@ export function RoutePlanPage(): React.JSX.Element {
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AltRoute color="primary" aria-hidden="true" />
-            <Typography variant="h1" component="h1">
-              TruckSafe
+            <Typography variant="h1" component="h1" sx={{ m: 0 }}>
+              <Box
+                component="img"
+                src="/logo-sidebar.png"
+                alt="TruckSafe"
+                sx={{ display: 'block', height: 48 }}
+              />
             </Typography>
           </Box>
           {mutation.isPending && <CircularProgress size={20} aria-hidden="true" />}
@@ -235,6 +219,7 @@ export function RoutePlanPage(): React.JSX.Element {
               onSubmit={handleSubmit}
               isPending={mutation.isPending}
               onCancel={handleCancel}
+              onOriginChange={setOriginCity}
             />
           </section>
         </Box>
