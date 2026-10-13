@@ -20,7 +20,14 @@ interface RouteCardProps {
   onSelect?: (routeId: string) => void;
 }
 
-/** One route alternative. Ineligible routes are never shown as recommended. */
+/** One route alternative. Ineligible routes are never shown as recommended.
+ *
+ * The whole card selects on pointer input (inner controls keep their own
+ * behavior); keyboard users get the same action from the select button.
+ * Badges stay minimal: Recommended when applicable, Not eligible when the
+ * route cannot be used, and Selected only when the selection differs from
+ * the recommendation and needs clarification.
+ */
 export function RouteCard({
   route,
   label,
@@ -29,6 +36,10 @@ export function RouteCard({
   onSelect,
 }: RouteCardProps): React.JSX.Element {
   const showRecommended = recommended && route.is_eligible;
+  // The Selected chip only clarifies a choice that differs from the
+  // recommendation; the recommended-and-selected card already says both
+  // through its chip, outline, and button state.
+  const showSelected = selected && !showRecommended;
   const worst = worstRiskLevel(route.checkpoints);
   const token = statusTokens.recommended;
 
@@ -36,11 +47,25 @@ export function RouteCard({
     <Card
       data-route-id={route.id}
       aria-label={`${label}${showRecommended ? ', recommended' : ''}${route.is_eligible ? '' : ', not eligible'}${selected ? ', selected' : ''}`}
+      onClick={(event) => {
+        if (onSelect === undefined) return;
+        // Pointer convenience only: taps on inner controls (checkpoint
+        // accordion, select button) keep their own behavior.
+        if (
+          (event.target as HTMLElement).closest(
+            'button, a, input, select, textarea, [role="button"]',
+          ) !== null
+        ) {
+          return;
+        }
+        onSelect(route.id);
+      }}
       sx={
         showRecommended || selected
           ? {
               border: `2px solid ${token.border}`,
               ...(selected ? { boxShadow: `0 0 0 2px ${token.border}` } : null),
+              ...(onSelect !== undefined ? { cursor: 'pointer' } : null),
             }
           : undefined
       }
@@ -56,8 +81,8 @@ export function RouteCard({
             {showRecommended && (
               <Chip label="Recommended" color="primary" sx={{ fontWeight: 700 }} />
             )}
-            <EligibilityBadge isEligible={route.is_eligible} />
-            {selected && <Chip label="Selected" size="small" color="primary" />}
+            {!route.is_eligible && <EligibilityBadge isEligible={false} />}
+            {showSelected && <Chip label="Selected" size="small" color="primary" />}
           </Box>
           <Typography variant="body2" color="text.secondary">
             {formatDuration(route.duration_seconds)} · {formatMiles(route.distance_miles)}

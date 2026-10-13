@@ -1,16 +1,32 @@
-import { Alert, Box, Card, CardContent, Chip, Typography } from '@mui/material';
+import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Alert,
+  Box,
+  Card,
+  CardContent,
+  Chip,
+  Typography,
+} from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 import { statusTokens } from '../../app/theme';
+import { formatScore } from '../../lib/format';
 import { routeLabelsById } from '../../features/route-planning/labels';
 import type { RoutePlanResponse } from '../../features/route-planning/types';
-import { RequestIdNotice } from './RequestIdNotice';
 
 interface RecommendationSummaryProps {
   response: RoutePlanResponse;
   requestId: string | null;
 }
 
-/** Recommendation status. Never selects a route when none is eligible. */
+/**
+ * Recommendation status. The primary message is plain user language;
+ * raw ranking criteria stay behind a "Technical details" disclosure so
+ * they never dominate the card. Never selects a route when none is
+ * eligible.
+ */
 export function RecommendationSummary({
   response,
   requestId,
@@ -40,7 +56,7 @@ export function RecommendationSummary({
       <CardContent>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
           <Chip
-            label={`Recommended: ${recommendedId !== null ? (labels[recommendedId] ?? recommendedId) : ''}`}
+            label={`Recommended: ${labels[recommendedId] ?? recommendedId}`}
             sx={{
               backgroundColor: token.background,
               color: token.text,
@@ -49,21 +65,62 @@ export function RecommendationSummary({
             }}
           />
         </Box>
-        {reason !== null ? (
-          <>
-            <Typography variant="body2">{reason.message}</Typography>
+        <Typography variant="body2">
+          Recommended because it has the lowest overall weather risk and travel time.
+        </Typography>
+        <Accordion disableGutters sx={{ mt: 1, boxShadow: 'none' }}>
+          <AccordionSummary
+            expandIcon={<ExpandMoreIcon />}
+            aria-controls="recommendation-technical-details"
+            id="recommendation-technical-header"
+          >
             <Typography variant="caption" color="text.secondary">
-              Criteria, in priority order: {reason.criteria.join(', ')}.
+              Technical details
             </Typography>
-          </>
-        ) : (
-          <Typography variant="body2" color="text.secondary">
-            The backend selected this route without an explanation.
-          </Typography>
-        )}
-        <Box sx={{ mt: 1 }}>
-          <RequestIdNotice requestId={requestId} />
-        </Box>
+          </AccordionSummary>
+          <AccordionDetails id="recommendation-technical-details">
+            {reason !== null ? (
+              <>
+                <Typography variant="body2">{reason.message}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Criteria, in priority order: {reason.criteria.join(', ')}.
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: 'block', mt: 0.5 }}
+                >
+                  Ranking values:{' '}
+                  {reason.ranking_key.map((value) => formatScore(value)).join(' · ')}.
+                </Typography>
+              </>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                The backend selected this route without an explanation.
+              </Typography>
+            )}
+            <Box sx={{ mt: 1 }}>
+              {requestId !== null && requestId !== '' && (
+                <Typography
+                  component="code"
+                  variant="caption"
+                  sx={{
+                    display: 'block',
+                    mt: 0.5,
+                    p: 1,
+                    backgroundColor: 'background.default',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    wordBreak: 'break-all',
+                  }}
+                >
+                  Request ID: {requestId}
+                </Typography>
+              )}
+            </Box>
+          </AccordionDetails>
+        </Accordion>
       </CardContent>
     </Card>
   );
