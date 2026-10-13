@@ -303,6 +303,20 @@ def test_mock_geocode_resolves_known_addresses() -> None:
     )
 
 
+def test_mock_geocode_places_demo_cities_at_real_coordinates() -> None:
+    """ Cities offered by the frontend must land on the true map location.
+
+    Regression: "Houston, TX" once hashed to a point over Florida because
+    the mock table only knew four cities.
+    """
+    houston = MockRoutingProvider().geocode("Houston, TX")
+    assert houston == Coordinate(latitude=29.7604, longitude=-95.3698)
+    for address in ("Chicago, IL", "Phoenix, AZ", "Atlanta, GA", "Seattle, WA"):
+        resolved = MockRoutingProvider().geocode(address)
+        assert 25.0 <= resolved.latitude <= 48.0
+        assert -125.0 <= resolved.longitude <= -67.0
+
+
 def test_mock_geocode_derives_stable_fallback_coordinates() -> None:
     """Unknown addresses derive deterministic in-bounds coordinates."""
     first = MockRoutingProvider().geocode("Springfield, ZZ")
