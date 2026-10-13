@@ -1,8 +1,37 @@
 # Deployment
 
-There is no production deployment in this slice. The supported way to run
-the application is the local demo setup below; a hosted application has
-not been verified from this repository.
+## Live backend (EC2 demo, us-east-1)
+
+Direct (HTTP): `http://ec2-100-61-113-239.compute-1.amazonaws.com:8000`
+HTTPS (CloudFront): `https://d3qhyee63c8gsx.cloudfront.net`
+Distribution `EV6VWSDD3TJJL`, origin EC2:8000 (HTTP-only), caching
+disabled, `AllViewerExceptHostHeader` so query strings (e.g.
+`offset_hours`) reach the API while `Host` stays the EC2 name the
+backend allows.
+
+- Instance `i-08594a0ca88a818bb` (`t3.micro`, Amazon Linux 2023,
+  `trucksafe-api` in `us-east-1a`), image
+  `026621559747.dkr.ecr.us-east-1.amazonaws.com/trucksafe-api:cors-1`.
+- Security group `sg-00889e65ca79422c1` allows TCP 8000 only (no SSH;
+  management via SSM Session Manager).
+- CORS is enforced by `django-cors-headers`: exact origins via
+  `CORS_ALLOWED_ORIGINS`, regexes via `CORS_ALLOWED_ORIGIN_REGEXES`
+  (live: `https://[a-z0-9-]+\.vercel\.app`); unlisted origins get no
+  `Access-Control-Allow-Origin` (verified live against the EC2 host).
+- Smoke-tested: `/api/v1/health` ok, `/api/v1/ready` ready,
+  `POST /api/v1/route-plans` Chicago → Houston returns 3 routes with a
+  deterministic recommendation; preflight from a `vercel.app` origin is
+  echoed, other origins are not.
+- App Runner was attempted first but the account's free plan cannot
+  subscribe to it (`SubscriptionRequiredException`); EC2 + CloudFront
+  is the fallback.
+- Cost control (t3.micro + 8 GB EBS + CloudFront requests bill while
+  running): `aws ec2 stop-instances --region us-east-1 --instance-ids
+  i-08594a0ca88a818bb` pauses compute; terminating deletes everything
+  (also delete the ECR images, the CloudFront distribution, and the
+  `TruckSafeEC2ECRRead` role if fully tearing down).
+
+There is no production deployment in this slice beyond the demo above.
 
 ## Local demo
 
@@ -28,12 +57,110 @@ the road-following OSRM/Photon adapter instead of the mock routes. It
 needs internet access and no credentials; failures surface as the
 documented `422`/`503` error envelopes, never with internal details.
 
+## AWS deployment preparation
+
+No AWS resources have been provisioned from this repository. The plan
+below is ready to execute once the user approves provisioning.
+
+### Recommended architecture
+
+- Frontend: AWS Amplify hosting for `apps/web` (Amplify-managed domain
+  with TLS; SPA fallback via a `/<*>` → `/index.html` 200 rewrite).
+- Backend: AWS App Runner from `apps/api/Dockerfile` (preferred for the
+  first deployment; ECS Fargate only if the repository later needs it).
+- Secrets: AWS Secrets Manager or SSM Parameter Store, injected as
+  App Runner environment variables (never committed).
+- Logs: CloudWatch (App Runner streams stdout/stderr by default, and the
+  container sets `PYTHONUNBUFFERED=1`).
+- Database: none added. The demo slice uses the ephemeral SQLite file
+  created at boot; do not add RDS unless the application later requires
+  real persistence.
+
+### Backend container
+
+Build from the repository root (or set the App Runner source directory
+to `apps/api`):
+
+```sh
+docker build -t trucksafe-api apps/api
+docker run -e ALLOWED_HOSTS=localhost -e DJANGO_SECRET_KEY=dev-only \
+  -p 8000:8000 trucksafe-api
+```
+
+- Start command (in the Dockerfile): migrate, then
+  `gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000}`.
+- Listens on `0.0.0.0` and honors the App Runner-provided `PORT`.
+- `DJANGO_DEBUG=false` is baked in; `DJANGO_SECRET_KEY` must be supplied
+  or the container fails fast instead of booting with the public dev key.
+- Health checks: `GET /api/v1/health` (liveness),
+  `GET /api/v1/ready` (per-dependency `200`/`503` readiness).
+
+### Required environment variables (App Runner)
+
+| Variable | Value | Notes |
+|---|---|---|
+| `DJANGO_DEBUG` | `false` | Baked into the image; override only to debug |
+| `DJANGO_SECRET_KEY` | secret | From Secrets Manager/SSM; required when `DEBUG=false` |
+| `ALLOWED_HOSTS` | `<service-url>,<amplify-domain>` | Comma-separated; empty default rejects all hosts when `DEBUG=false` |
+| `TRUCKSAFE_ROUTING_PROVIDER` | blank (mock) | Set `osrm` only for the road-following mode (needs outbound internet, no credentials) |
+| `TRUCKSAFE_WEATHER_PROVIDER` | blank | Mock-only in this slice |
+
+### Frontend (Amplify)
+
+Build settings: `npm ci` / `npm run build`, artifact directory
+`apps/web/dist` (set the Amplify app root to `apps/web` so the defaults
+apply). Environment at build time:
+
+| Variable | Value | Notes |
+|---|---|---|
+| `VITE_API_BASE_URL` | `https://<apprunner-service>/api/v1` | No `localhost` may remain in the production build |
+| `VITE_MAP_STYLE_URL` | default CARTO Positron or custom | HTTPS style document; map tiles load over HTTPS |
+
+### CORS
+
+Backend CORS is deferred in `specs/007-validation-and-reliability.md`
+(no `django-cors-headers` in this slice). Until an allowlist exists,
+serve the frontend and the API from one origin (Amplify rewrite/proxy
+to the App Runner service) or keep the API private to the demo. Adding
+a CORS allowlist for exactly the Amplify domain is a pre-launch
+follow-up, not a code change made here.
+
+### Provider modes
+
+- Mock mode (default, no credentials, offline-capable): deterministic
+  routes and weather; label any hosted demo as demonstration data, never
+  as live provider data.
+- Real routing mode (`TRUCKSAFE_ROUTING_PROVIDER=osrm`): road-following
+  OSRM/Photon over the public demo endpoints (internet egress required,
+  no credentials); transient failures surface as documented `503`s.
+  A weather adapter beyond the mock does not exist yet.
+
+### Rollback
+
+App Runner keeps prior revisions: roll back by deploying the previous
+image revision in the console. Amplify likewise redeploys any prior
+build. Both are stateless in this slice, so rollback is a redeploy.
+
+### Cost considerations
+
+Amplify hosting (build minutes + bandwidth) and App Runner (per
+provisioned vCPU/GB-hour, scales to the configured concurrency) are the
+only expected charges. No RDS, ElastiCache, or NAT gateway is part of
+this plan.
+
+### Manual smoke test after deploy
+
+1. `GET https://<apprunner-service>/api/v1/health` → `200`.
+2. `GET https://<apprunner-service>/api/v1/ready` → `200` with database
+   `available`.
+3. Open the Amplify URL, plan Chicago, IL → Houston, TX: 3 routes, map
+   with checkpoints, heatmap, and slider `0`–`48` all render.
+4. Move the slider to `+48h`: the forecast label updates; break the grid
+   request and confirm routes stay with a forecast warning.
+
 ## Deferred for a production deployment
 
-- Host and reverse-proxy for the Django API and the static frontend
-  (serve both from one origin or configure backend CORS).
 - Managed database and cache (the local demo uses SQLite; `POSTGRES_*`
   and `REDIS_URL` in `.env.example` are planned, not wired).
-- Provider credentials, secret management, and log redaction review.
 - CORS allowlist, rate limiting, and structured request logging
   (deferred in `specs/007-validation-and-reliability.md`).
