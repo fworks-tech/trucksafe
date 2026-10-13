@@ -151,3 +151,65 @@ test('removes the previous map when a new plan starts', async ({ page }) => {
   await expect(page.getByRole('region', { name: /interactive route map/i })).toBeHidden();
   await expect(page.getByRole('radio')).toHaveCount(0);
 });
+
+test('updates the displayed forecast when the slider moves', async ({ page }) => {
+  await withEmptyBasemap(page);
+  const gridOffsets: number[] = [];
+  await page.route('**/weather-grid*', async (route) => {
+    const url = new URL(route.request().url());
+    gridOffsets.push(Number(url.searchParams.get('offset_hours')));
+    await route.continue();
+  });
+  await submitValidPlan(page);
+  await expectMapRegion(page);
+  await collapseSheetIfExpanded(page);
+
+  const slider = page.getByRole('slider', { name: /forecast hour offset/i });
+  await expect(slider).toBeVisible();
+  await expect(page.getByText('Departure time')).toBeVisible();
+
+  // The settled initial position fetches offset 0 (debounced, cached after).
+  await expect.poll(() => gridOffsets, { timeout: 20000 }).toContain(0);
+
+  // The slider disables while a forecast is loading; wait until it
+  // accepts input or Home/End keypresses land on a dead control.
+  await expect(slider).toBeEnabled({ timeout: 20000 });
+  await slider.focus();
+  await page.keyboard.press('End');
+  await expect(page.getByText('+48h')).toBeVisible();
+  await expect.poll(() => gridOffsets, { timeout: 20000 }).toContain(48);
+
+  // Returning to a cached offset updates the display without refetching.
+  const requestsBefore = gridOffsets.length;
+  await expect(slider).toBeEnabled({ timeout: 20000 });
+  // Grid arrivals re-render the slider and drop focus; re-focus first.
+  await slider.focus();
+  await page.keyboard.press('Home');
+  await expect(page.getByText('Departure time')).toBeVisible();
+  await page.waitForTimeout(600);
+  expect(gridOffsets.length).toBe(requestsBefore);
+});
+
+test('keeps route results when the forecast request fails', async ({ page }) => {
+  await withEmptyBasemap(page);
+  await page.route('**/weather-grid*', async (route) => {
+    await route.fulfill({
+      status: 503,
+      json: {
+        error: {
+          code: 'PROVIDER_UNAVAILABLE',
+          message: 'Weather provider temporarily unavailable.',
+          request_id: 'e2e-forecast-failure',
+        },
+      },
+    });
+  });
+  await submitValidPlan(page);
+  await expectMapRegion(page);
+
+  // The plan itself succeeded: routes stay, only the forecast degrades.
+  await expect(page.getByText('Route alternatives (3)')).toBeVisible();
+  await expect(page.getByText(/weather forecast unavailable/i)).toBeVisible({
+    timeout: 20000,
+  });
+});
