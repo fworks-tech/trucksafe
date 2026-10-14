@@ -8,8 +8,11 @@
 
 export interface TourStep {
   id: string;
-  /** `data-tour` anchor; null renders a centered dialog. */
-  target: string | null;
+  /**
+   * `data-tour` anchor(s); null renders a centered dialog. Multiple
+   * anchors spotlight their bounding union (e.g. origin + destination).
+   */
+  target: string | readonly string[] | null;
   title: string;
   body: string;
   /** Needs a generated plan; otherwise a fallback dialog shows. */
@@ -36,7 +39,7 @@ export function buildTourSteps(context: TourContext): TourStep[] {
     },
     {
       id: 'places',
-      target: 'origin-input',
+      target: ['origin-input', 'destination-input'],
       title: 'Origin and destination',
       body: 'Enter where the trip starts and ends — these locations generate the route alternatives. The quick-example chips above fill in Chicago to Dallas or Phoenix to Denver without submitting anything.',
       requiresResults: false,

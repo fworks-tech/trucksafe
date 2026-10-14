@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RoutePlanPage } from '../route-plan-page/RoutePlanPage';
 import { renderWithProviders } from '../../../test/render';
 import { GuidedTour } from './GuidedTour';
+import { measureTarget } from './tourSpotlight';
 import { TourBanner } from './TourBanner';
 import { readTourState } from './storage';
 
@@ -254,6 +255,51 @@ describe('GuidedTour', () => {
     expect(dialog).toHaveAttribute('aria-labelledby', 'guided-tour-title');
     expect(dialog).toHaveAttribute('aria-describedby', 'guided-tour-body');
     expect(within(dialog).getByText('Welcome to TruckSafe')).toBeInTheDocument();
+  });
+
+  it('spotlights the union of multiple anchors', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ): DOMRect {
+      const name = this.getAttribute('data-tour');
+      const top = name === 'destination-input' ? 120 : 50;
+      return {
+        x: 50,
+        y: top,
+        width: 100,
+        height: 40,
+        top,
+        right: 150,
+        bottom: top + 40,
+        left: 50,
+        toJSON: () => undefined,
+      } as DOMRect;
+    });
+    renderWithProviders(
+      <div>
+        <div data-tour="origin-input" />
+        <div data-tour="destination-input" />
+        <GuidedTour
+          hasResults={false}
+          mockMode={false}
+          onUseExample={() => {}}
+          onClose={() => {}}
+        />
+      </div>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByText('Origin and destination')).toBeInTheDocument();
+    // Both anchors measured: the single ring covers the union.
+    expect(screen.getByTestId('tour-spotlight')).toBeInTheDocument();
+    // Union math: y 50..160 across the two mocked boxes.
+    expect(measureTarget(['origin-input', 'destination-input'])).toEqual({
+      x: 50,
+      y: 50,
+      width: 100,
+      height: 110,
+    });
+    expect(measureTarget('missing-anchor')).toBeNull();
   });
 });
 

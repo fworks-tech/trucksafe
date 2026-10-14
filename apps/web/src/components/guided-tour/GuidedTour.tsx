@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { theme } from '../../app/theme';
 import { writeTourState } from './storage';
 import { buildTourSteps } from './tourSteps';
+import { measureTarget, type TargetRect, type TourAnchor } from './tourSpotlight';
 
 interface GuidedTourProps {
   /** A generated plan exists; result steps show real targets. */
@@ -17,28 +18,9 @@ interface GuidedTourProps {
   onClose: () => void;
 }
 
-interface TargetRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-const RING_PAD = 8;
+const RING_PAD = 14;
 const DIALOG_WIDTH = 340;
 const VIEWPORT_MARGIN = 12;
-
-/** Viewport-relative rect of the anchor, or null when it is missing. */
-function measureTarget(anchor: string | null): TargetRect | null {
-  if (anchor === null) return null;
-  const element = document.querySelector(`[data-tour="${anchor}"]`);
-  if (!(element instanceof HTMLElement) || !element.isConnected) return null;
-  const rect = element.getBoundingClientRect();
-  // jsdom (and display:none ancestors) report zero rects: treat the
-  // target as missing so the step falls back to a centered dialog.
-  if (rect.width < 2 || rect.height < 2) return null;
-  return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
-}
 
 /**
  * Interactive product tour: dimmed backdrop, spotlight ring on the
@@ -72,13 +54,14 @@ export function GuidedTour({
   const isFirst = clamped === 0;
   const isLast = clamped === steps.length - 1;
 
-  const refreshRect = (anchor: string | null): void => {
-    const element =
-      anchor === null ? null : document.querySelector(`[data-tour="${anchor}"]`);
-    if (element instanceof HTMLElement && element.isConnected) {
+  const refreshRect = (anchor: TourAnchor): void => {
+    const names = anchor === null ? [] : Array.isArray(anchor) ? anchor : [anchor];
+    const first =
+      names.length > 0 ? document.querySelector(`[data-tour="${names[0]}"]`) : null;
+    if (first instanceof HTMLElement && first.isConnected) {
       try {
-        if (typeof element.scrollIntoView === 'function') {
-          element.scrollIntoView({ block: 'center', behavior: 'auto' });
+        if (typeof first.scrollIntoView === 'function') {
+          first.scrollIntoView({ block: 'center', behavior: 'auto' });
         }
       } catch {
         // jsdom and overflow edge cases: spotlight still positions below.
@@ -186,19 +169,22 @@ export function GuidedTour({
     const vh = window.innerHeight;
     const rightX = rect.x + rect.width + 16;
     if (rightX + DIALOG_WIDTH <= vw - VIEWPORT_MARGIN) {
-      return { ...base, left: Math.max(rightX, VIEWPORT_MARGIN), top: 64 };
+      return { ...base, left: Math.max(rightX, VIEWPORT_MARGIN), top: VIEWPORT_MARGIN, maxHeight: vh - 2 * VIEWPORT_MARGIN };
     }
     const leftX = rect.x - DIALOG_WIDTH - 16;
     if (leftX >= VIEWPORT_MARGIN) {
-      return { ...base, left: leftX, top: 64 };
+      return { ...base, left: leftX, top: VIEWPORT_MARGIN, maxHeight: vh - 2 * VIEWPORT_MARGIN };
     }
+    const fallbackLeft = Math.max(
+      VIEWPORT_MARGIN,
+      Math.min(rect.x, vw - DIALOG_WIDTH - VIEWPORT_MARGIN),
+    );
+    const maxTop = Math.max(VIEWPORT_MARGIN, vh - 400);
     return {
       ...base,
-      left: Math.max(
-        VIEWPORT_MARGIN,
-        Math.min(rect.x, vw - DIALOG_WIDTH - VIEWPORT_MARGIN),
-      ),
-      top: Math.min(rect.y + rect.height + 16, vh - 200),
+      left: fallbackLeft,
+      top: Math.min(rect.y + rect.height + 16, maxTop),
+      maxHeight: vh - 2 * VIEWPORT_MARGIN,
     };
   })();
 
