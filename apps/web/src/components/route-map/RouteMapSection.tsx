@@ -237,7 +237,13 @@ export function RouteMapSection({
       component="section"
       aria-label="Route map"
       data-tour="route-map"
-      sx={{ position: 'absolute', inset: 0 }}
+      sx={{
+        position: 'absolute',
+        inset: 0,
+        // MapLibre popups render plain text: honor the newlines the
+        // popup builders emit instead of collapsing them.
+        '& .maplibregl-popup-content': { whiteSpace: 'pre-line' },
+      }}
     >
       <Typography variant="h2" component="h2" sx={{ position: 'absolute', left: -9999 }}>
         Route map
@@ -371,6 +377,7 @@ export function RouteMapSection({
             <MapCheckpointDetail
               checkpoint={selectedCheckpointPayload}
               role={selectedPoint.role}
+              routeLabel={routeLabelsById(response.routes)[selectedPoint.routeId]}
               onClose={() => onSelectCheckpoint(null)}
             />
           </Box>

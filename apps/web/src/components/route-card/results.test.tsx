@@ -254,6 +254,20 @@ describe('CheckpointList', () => {
     expect(screen.getByText(/wind 30 mph/)).toBeInTheDocument();
   });
 
+  it('lists each risk reason on its own line', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <CheckpointList
+        routeId="route-1"
+        checkpoints={[makeCheckpoint({ riskReasons: ['rain 0.3 in/h', 'wind 35 mph'] })]}
+      />,
+    );
+    await user.click(screen.getByText(/Checkpoints \(1\)/));
+    const items = screen.getAllByRole('listitem');
+    expect(items.map((item) => item.textContent)).toContain('rain 0.3 in/h');
+    expect(items.map((item) => item.textContent)).toContain('wind 35 mph');
+  });
+
   it('shows unavailable weather instead of a risk level', async () => {
     const user = userEvent.setup();
     renderWithProviders(

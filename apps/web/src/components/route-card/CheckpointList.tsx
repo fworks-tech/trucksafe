@@ -17,6 +17,7 @@ import { formatEta, formatMiles } from '../../lib/format';
 import type { CheckpointSelection } from '../../features/route-map/geo';
 import type { CheckpointPayload } from '../../features/route-planning/types';
 import { RiskBadge } from './RiskBadge';
+import { RiskReasons } from './RiskReasons';
 import { WeatherStatus } from './WeatherStatus';
 
 interface CheckpointListProps {
@@ -50,7 +51,14 @@ export function CheckpointList({
         <Typography>Checkpoints ({checkpoints.length})</Typography>
       </AccordionSummary>
       <AccordionDetails>
-        <List disablePadding aria-label={`Checkpoints for ${routeId}`}>
+        {/* Capped so a 40-checkpoint plan cannot stretch its card (and
+            the whole carousel track) to thousands of pixels; the list
+            scrolls inside instead. */}
+        <List
+          disablePadding
+          aria-label={`Checkpoints for ${routeId}`}
+          sx={{ overflowY: 'auto', maxHeight: 320 }}
+        >
           {checkpoints.map((checkpoint, index) => {
             const role = roleOf(index, checkpoints.length);
             const content = (
@@ -84,11 +92,7 @@ export function CheckpointList({
                     <WeatherStatus available={false} />
                   )}
                 </Box>
-                {checkpoint.risk_reasons.length > 0 && (
-                  <Typography variant="caption" color="text.secondary">
-                    Why: {checkpoint.risk_reasons.join('; ')}
-                  </Typography>
-                )}
+                <RiskReasons reasons={checkpoint.risk_reasons} />
               </Stack>
             );
             // Rows steer the map when a handler exists; otherwise they
