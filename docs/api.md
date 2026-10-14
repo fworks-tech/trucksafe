@@ -227,11 +227,12 @@ Checks performed:
 - `routing_provider` / `weather_provider`: the configured provider
   factory resolves to an adapter implementing the provider protocol.
 
-Mock-phase limitation: the current providers are deterministic mocks
-with no network or credentials, so provider checks verify wiring and
-configuration — not external reachability. A dotted import path or
+Default providers are deterministic mocks with no network or
+credentials, so with unset provider settings the checks verify wiring
+and configuration — not external reachability. A dotted import path or
 callable in `settings.TRUCKSAFE_ROUTING_PROVIDER` /
-`TRUCKSAFE_WEATHER_PROVIDER` selects a real adapter later; an
+`TRUCKSAFE_WEATHER_PROVIDER` selects a real adapter (`osrm` for
+road-following routing, `openmeteo` for forecast weather); an
 unresolvable value reports that provider `unavailable` instead of
 raising. Those settings are deployer-controlled server-side
 configuration: they are never read from request data, and module paths
