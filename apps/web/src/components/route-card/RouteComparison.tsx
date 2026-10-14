@@ -72,7 +72,7 @@ export function RouteComparison({
   }, [routes, selectedRouteId]);
 
   return (
-    <section aria-label="Route alternatives">
+    <section aria-label="Route alternatives" data-tour="route-cards">
       <Box
         sx={{
           display: 'flex',

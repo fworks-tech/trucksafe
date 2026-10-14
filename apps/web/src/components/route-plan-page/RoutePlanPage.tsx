@@ -15,6 +15,9 @@ import { RouteSidebar } from '../layout/RouteSidebar';
 import { RoutePlanForm } from '../route-planning-form/RoutePlanForm';
 import { OriginFocusMap } from '../route-map/OriginFocusMap';
 import { ForecastSection } from '../route-map/ForecastSection';
+import { TourBanner } from '../guided-tour/TourBanner';
+import { GuidedTour } from '../guided-tour/GuidedTour';
+import { toLocalInputValue } from '../../lib/datetime';
 import { RecommendationSummary } from '../route-card/RecommendationSummary';
 import { RequestStatus } from '../route-card/RequestStatus';
 import { RouteComparison } from '../route-card/RouteComparison';
@@ -46,6 +49,10 @@ export function RoutePlanPage(): React.JSX.Element {
   // Dismissible mock-source notice (sidebar noise); it unmounts with
   // the response on every submit, so dismissal resets per plan.
   const [mockNoticeDismissed, setMockNoticeDismissed] = useState(false);
+  // Guided tour overlay state; refreshToken re-reads tour persistence
+  // after the tour closes so the banner collapses to its restart form.
+  const [tourOpen, setTourOpen] = useState(false);
+  const [tourRefresh, setTourRefresh] = useState(0);
   // Origin city driving the pre-plan background map. Unknown free text
   // keeps the previous viewport (lookup returns null, center is unchanged).
   const [originCity, setOriginCity] = useState<string>(DEFAULT_ORIGIN_CITY);
@@ -100,6 +107,23 @@ export function RoutePlanPage(): React.JSX.Element {
     setSelectedRouteId(null);
     setActiveTab('plan');
   }, [mutation]);
+
+  // Explicit tour action only (never auto-fired): fills the Chicago to
+  // Dallas example and submits it through the same path as the form.
+  const handleUseExample = useCallback(() => {
+    handleSubmit({
+      origin: 'Chicago, IL',
+      destination: 'Dallas, TX',
+      departure: toLocalInputValue(new Date(Date.now() + 3600000)),
+      loadWeight: 30000,
+      checkpointInterval: 25,
+    });
+  }, [handleSubmit]);
+
+  const handleCloseTour = useCallback(() => {
+    setTourOpen(false);
+    setTourRefresh((value) => value + 1);
+  }, []);
 
   const handleSelectRoute = useCallback((routeId: string) => {
     setSelectedRouteId(routeId);
@@ -179,6 +203,7 @@ export function RoutePlanPage(): React.JSX.Element {
                 id="tab-routes"
                 label="Routes"
                 value="routes"
+                data-tour="routes-tab"
                 disabled={response === null}
               />
             </Tabs>
@@ -198,6 +223,8 @@ export function RoutePlanPage(): React.JSX.Element {
           Plan a truck route and compare weather-risk alternatives. Forecast weather is
           simulated, not live.
         </Typography>
+
+        <TourBanner onStart={() => setTourOpen(true)} refreshToken={tourRefresh} />
 
         {response !== null && response.mock_mode && !mockNoticeDismissed && (
           <Alert
@@ -245,6 +272,7 @@ export function RoutePlanPage(): React.JSX.Element {
         <Box
           role="tabpanel"
           id="tabpanel-routes"
+          data-tour="route-results"
           aria-labelledby="tab-routes"
           sx={{ display: activeTab === 'routes' ? 'block' : 'none', pt: 1 }}
         >
@@ -295,6 +323,14 @@ export function RoutePlanPage(): React.JSX.Element {
           )}
         </Box>
       </RouteSidebar>
+      {tourOpen && (
+        <GuidedTour
+          hasResults={response !== null}
+          mockMode={response?.mock_mode ?? false}
+          onUseExample={handleUseExample}
+          onClose={handleCloseTour}
+        />
+      )}
     </Box>
   );
 }

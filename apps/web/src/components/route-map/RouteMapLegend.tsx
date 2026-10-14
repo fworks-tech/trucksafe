@@ -81,6 +81,7 @@ export function RouteMapLegend({
   return (
     <Paper
       elevation={3}
+      data-tour="map-legend"
       sx={{
         p: 1,
         maxWidth: 320,
