@@ -17,7 +17,7 @@ request, so the cache only lives for that request.
 import json
 from collections.abc import Mapping
 from datetime import UTC, datetime
-from math import isfinite
+from math import floor, isfinite
 from urllib import error as urlerror
 from urllib import parse as urlparse
 from urllib import request as urlrequest
@@ -45,6 +45,10 @@ def _default_transport(url: str, headers: Mapping[str, str]) -> bytes:
         with urlrequest.urlopen(request, timeout=_TIMEOUT_SECONDS) as response:
             return response.read()
     except urlerror.HTTPError as exc:
+        if exc.code in (408, 429):
+            raise ProviderTransientError(
+                f"openmeteo transport failure: HTTP {exc.code}"
+            ) from exc
         if 400 <= exc.code < 500:
             raise ProviderPermanentError(
                 f"openmeteo rejected the request: HTTP {exc.code}"
@@ -81,10 +85,21 @@ class OpenMeteoWeatherProvider:
         if key not in self._series:
             self._fetch_series(key)
         start = self._series_start[key]
-        index = round((valid_time - start).total_seconds() / 3600.0)
+        index = floor((valid_time - start).total_seconds() / 3600.0 + 0.5)
         if index < 0 or index >= len(self._series[key]):
             return None
         return self._series[key][index]
+
+    def _get(self, url: str) -> bytes:
+        """GET url, mapping raw transport failures to transient errors.
+
+        The injected transport raises raw network errors; they must never
+        escape unmapped, or callers see internals instead of the 503 path.
+        """
+        try:
+            return self._transport(url, {"User-Agent": _USER_AGENT})
+        except (urlerror.URLError, TimeoutError, OSError) as exc:
+            raise ProviderTransientError(f"openmeteo transport failure: {exc}") from exc
 
     def _fetch_series(self, key: tuple[float, float]) -> None:
         """Download and normalize one point's hourly forecast series."""
@@ -98,9 +113,7 @@ class OpenMeteoWeatherProvider:
                 "forecast_days": str(_FORECAST_DAYS),
             }
         )
-        body = self._transport(
-            f"{_OPENMETEO_BASE_URL}?{query}", {"User-Agent": _USER_AGENT}
-        )
+        body = self._get(f"{_OPENMETEO_BASE_URL}?{query}")
         try:
             payload = json.loads(body.decode("utf-8"))
         except (UnicodeDecodeError, ValueError) as exc:
@@ -130,8 +143,8 @@ def _parse_series(
     ):
         raise ProviderTransientError("openmeteo: invalid hourly series")
     try:
-        start = datetime.fromisoformat(times[0])
-    except (TypeError, ValueError) as exc:
+        start = datetime.fromisoformat(times[0].replace("Z", "+00:00"))
+    except (TypeError, ValueError, AttributeError) as exc:
         raise ProviderTransientError("openmeteo: invalid series time") from exc
     if start.tzinfo is None:
         # timezone=UTC answers carry naive ISO hours; treat them as UTC.
