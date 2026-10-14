@@ -18,6 +18,14 @@ interface RouteCardProps {
   selected?: boolean;
   /** When provided, the card offers a selection control synced with the map. */
   onSelect?: (routeId: string) => void;
+  /** True when this route is hidden from the map (the card stays). */
+  hidden?: boolean;
+  /** When provided, the card offers a map visibility toggle. */
+  onToggleVisibility?: (routeId: string) => void;
+  /** Currently map-selected checkpoint, for the checkpoint list. */
+  selectedCheckpointId?: string | null;
+  /** When provided, checkpoint rows focus the map. */
+  onSelectCheckpoint?: (checkpointId: string) => void;
 }
 
 /** One route alternative. Ineligible routes are never shown as recommended.
@@ -34,6 +42,10 @@ export function RouteCard({
   recommended,
   selected = false,
   onSelect,
+  hidden = false,
+  onToggleVisibility,
+  selectedCheckpointId = null,
+  onSelectCheckpoint,
 }: RouteCardProps): React.JSX.Element {
   const showRecommended = recommended && route.is_eligible;
   // The Selected chip only clarifies a choice that differs from the
@@ -98,20 +110,38 @@ export function RouteCard({
             {formatMiles(route.high_miles)}
             {route.no_travel_miles > 0 &&
               ` · No Travel ${formatMiles(route.no_travel_miles)}`}
-            {' · '}Avg risk {formatScore(route.average_risk_score)}
+            {' · '}Avg risk {formatScore(route.average_risk_score)} of 5
           </Typography>
-          <CheckpointList checkpoints={route.checkpoints} routeId={route.id} />
-          {onSelect !== undefined && (
-            <Box>
-              <Button
-                type="button"
-                variant={selected ? 'contained' : 'outlined'}
-                size="small"
-                aria-pressed={selected}
-                onClick={() => onSelect(route.id)}
-              >
-                {selected ? 'Selected on map' : 'Show on map'}
-              </Button>
+          <CheckpointList
+            checkpoints={route.checkpoints}
+            routeId={route.id}
+            selectedCheckpointId={selectedCheckpointId}
+            onSelectCheckpoint={onSelectCheckpoint}
+          />
+          {(onSelect !== undefined || onToggleVisibility !== undefined) && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {onSelect !== undefined && (
+                <Button
+                  type="button"
+                  variant={selected ? 'contained' : 'outlined'}
+                  size="small"
+                  aria-pressed={selected}
+                  onClick={() => onSelect(route.id)}
+                >
+                  {selected ? 'Selected on map' : 'Show on map'}
+                </Button>
+              )}
+              {onToggleVisibility !== undefined && (
+                <Button
+                  type="button"
+                  variant="outlined"
+                  size="small"
+                  aria-pressed={!hidden}
+                  onClick={() => onToggleVisibility(route.id)}
+                >
+                  {hidden ? 'Show route' : 'Hide route'}
+                </Button>
+              )}
             </Box>
           )}
         </Stack>

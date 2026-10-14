@@ -23,7 +23,7 @@ async function submitValidPlan(page: Page): Promise<void> {
   await page.goto('/');
   await page.getByLabel(/origin/i).fill('Chicago, IL');
   await page.getByLabel(/destination/i).fill('Dallas, TX');
-  await page.getByLabel(/departure date and time/i).fill('2026-10-12T14:30');
+  // Departure ships prefilled with today/now and stays untouched.
   await page.getByLabel(/load weight/i).fill('20000');
   await page.getByRole('button', { name: /plan route/i }).click();
   // First result render can race the cold lazy-map transform on a shared
@@ -126,6 +126,36 @@ test('supports keyboard route selection', async ({ page }) => {
   await page.keyboard.press('Enter');
   // Exactly one route stays selected.
   await expect(page.getByRole('button', { name: 'Selected on map' })).toHaveCount(1);
+});
+
+test('hides and re-shows a route without losing selection', async ({ page }) => {
+  await withEmptyBasemap(page);
+  await submitValidPlan(page);
+  await expectMapRegion(page);
+
+  const card = page.locator('[data-route-id]').first();
+  await card.getByRole('button', { name: 'Hide route' }).click();
+  await expect(card.getByRole('button', { name: 'Show route' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Selected on map' })).toHaveCount(1);
+  await card.getByRole('button', { name: 'Show route' }).click();
+  await expect(card.getByRole('button', { name: 'Hide route' })).toBeVisible();
+});
+
+test('focuses a sidebar checkpoint pick on the map', async ({ page }) => {
+  await withEmptyBasemap(page);
+  await submitValidPlan(page);
+  await expectMapRegion(page);
+
+  const card = page.locator('[data-route-id]').first();
+  await card.getByText(/Checkpoints \(\d+\)/).click();
+  await card
+    .getByRole('button', { name: /0\.0 mi/ })
+    .first()
+    .click();
+  // The pick raises the checkpoint detail panel and popup path.
+  await expect(
+    page.getByRole('heading', { name: /checkpoint 1 of route/i }),
+  ).toBeVisible();
 });
 
 test('falls back safely when the map style fails', async ({ page }) => {

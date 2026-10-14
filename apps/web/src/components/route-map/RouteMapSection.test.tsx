@@ -75,6 +75,14 @@ const { FakeMap } = vi.hoisted(() => {
 
     zoomOut(): void {}
 
+    getZoom(): number {
+      return 9;
+    }
+
+    easeTo(): void {}
+
+    jumpTo(): void {}
+
     setFilter(layer: string, filter: unknown): void {
       this.filters[layer] = filter;
     }
@@ -151,6 +159,8 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
         weatherGrid={null}
+        selectedCheckpointId={null}
+        onSelectCheckpoint={() => {}}
       />,
     );
     unmount();
@@ -170,6 +180,8 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
         weatherGrid={null}
+        selectedCheckpointId={null}
+        onSelectCheckpoint={() => {}}
       />,
     );
     expect(screen.getByLabelText('Loading map')).toBeInTheDocument();
@@ -197,6 +209,8 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-1"
         onSelectRoute={(id) => seen.push(id)}
         weatherGrid={null}
+        selectedCheckpointId={null}
+        onSelectCheckpoint={() => {}}
       />,
     );
     FakeMap.instances[0]?.emit('load');
@@ -217,6 +231,8 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-2"
         onSelectRoute={(id) => seen.push(id)}
         weatherGrid={null}
+        selectedCheckpointId={null}
+        onSelectCheckpoint={() => {}}
       />,
     );
     await waitFor(() => {
@@ -235,12 +251,31 @@ describe('RouteMapSection', () => {
     const plan = makeRoutePlan();
     const firstCheckpoint = plan.routes[0]?.checkpoints[0];
     if (firstCheckpoint === undefined) throw new Error('fixture has no checkpoints');
-    renderWithProviders(
+    let picked: string | null = null;
+    const renderSection = (): void => {
+      rerender(
+        <RouteMapSection
+          response={plan}
+          selectedRouteId="route-1"
+          onSelectRoute={() => {}}
+          weatherGrid={null}
+          selectedCheckpointId={picked}
+          onSelectCheckpoint={(id) => {
+            picked = id;
+          }}
+        />,
+      );
+    };
+    const { rerender } = renderWithProviders(
       <RouteMapSection
         response={plan}
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
         weatherGrid={null}
+        selectedCheckpointId={picked}
+        onSelectCheckpoint={(id) => {
+          picked = id;
+        }}
       />,
     );
     FakeMap.instances[0]?.emit('load');
@@ -255,12 +290,16 @@ describe('RouteMapSection', () => {
         },
       ],
     });
+    // Controlled selection: the map reports the pick, the parent feeds it
+    // back in (sidebar rows use the same path).
+    renderSection();
     // First fixture checkpoint of route-1: origin with LOW risk.
     expect(
       await screen.findByRole('heading', { name: /checkpoint 1 of route/i }),
     ).toBeInTheDocument();
     expect(screen.getByText('Origin')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /close checkpoint details/i }));
+    renderSection();
     expect(
       screen.queryByRole('heading', { name: /checkpoint 1 of route/i }),
     ).not.toBeInTheDocument();
@@ -277,6 +316,8 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-1"
         onSelectRoute={(id) => seen.push(id)}
         weatherGrid={null}
+        selectedCheckpointId={null}
+        onSelectCheckpoint={() => {}}
       />,
     );
     expect(screen.getByText('Map unavailable for this result')).toBeInTheDocument();
@@ -296,6 +337,8 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
         weatherGrid={null}
+        selectedCheckpointId={null}
+        onSelectCheckpoint={() => {}}
       />,
     );
     FakeMap.instances[0]?.emit('error');
@@ -314,6 +357,8 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
         weatherGrid={null}
+        selectedCheckpointId={null}
+        onSelectCheckpoint={() => {}}
       />,
     );
     FakeMap.instances[0]?.emit('load');
@@ -334,6 +379,8 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
         weatherGrid={null}
+        selectedCheckpointId={null}
+        onSelectCheckpoint={() => {}}
       />,
     );
     const results = await axe.run(fallback.container, {

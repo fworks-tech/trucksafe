@@ -102,6 +102,22 @@ const { FakeMap, FakeMarker, FakePopup, fakeState } = vi.hoisted(() => {
       this.filters[layer] = filter;
     }
 
+    zoom = 9;
+    easeToCalls: unknown[] = [];
+    jumpToCalls: unknown[] = [];
+
+    getZoom(): number {
+      return this.zoom;
+    }
+
+    easeTo(options: unknown): void {
+      this.easeToCalls.push(options);
+    }
+
+    jumpTo(options: unknown): void {
+      this.jumpToCalls.push(options);
+    }
+
     fitBounds(bounds: unknown, options: unknown): void {
       this.fitBoundsCalls.push({ bounds, options });
     }
@@ -407,6 +423,104 @@ describe('RouteMapAdapter layers', () => {
       'cp-2',
     ]);
     expect(map.fitBoundsCalls).toHaveLength(0);
+    adapter.destroy();
+  });
+
+  it('hides routes and checkpoints while keeping selection state', async () => {
+    const { adapter, map } = await readyAdapter();
+    adapter.setRoutes(LINES, POINTS);
+    adapter.setSelected('route-1', 'cp-1');
+    adapter.setHiddenRoutes(['route-2']);
+    const hidden = ['!in', ['get', 'routeId'], ['literal', ['route-2']]];
+    expect(map.filters['trucksafe-route-lines']).toEqual(hidden);
+    expect(map.filters['trucksafe-checkpoints']).toEqual(hidden);
+    expect(map.filters['trucksafe-route-selected']).toEqual([
+      'all',
+      ['==', ['get', 'routeId'], 'route-1'],
+      hidden,
+    ]);
+    adapter.setHiddenRoutes([]);
+    expect(map.filters['trucksafe-route-lines']).toBeNull();
+    expect(map.filters['trucksafe-route-selected']).toEqual([
+      '==',
+      ['get', 'routeId'],
+      'route-1',
+    ]);
+    adapter.destroy();
+  });
+
+  it('reports checkpoint picks and leaves popup text to the caller', async () => {
+    const seen: string[] = [];
+    const { adapter, map } = await readyAdapter({
+      onCheckpointSelect: (id) => seen.push(id),
+    });
+    adapter.setRoutes(LINES, POINTS);
+    const handler = map.handlers.find(
+      (entry) => entry.event === 'click' && entry.layer === 'trucksafe-checkpoints',
+    )?.fn as ((event: unknown) => void) | undefined;
+    handler?.({
+      features: [
+        {
+          properties: { checkpointId: 'cp-1' },
+          geometry: { coordinates: [-87.63, 41.88] },
+        },
+      ],
+    });
+    expect(seen).toEqual(['cp-1']);
+    // Public popup API never throws with caller-built text.
+    adapter.showPopup([-87.63, 41.88], 'Checkpoint 1 · Low risk');
+    adapter.closePopup();
+    adapter.destroy();
+  });
+
+  it('reports heat-cell picks with coordinates', async () => {
+    const seen: Array<{ cellId: string; at: unknown }> = [];
+    const { adapter, map } = await readyAdapter({
+      onHeatCellSelect: (cellId, at) => seen.push({ cellId, at }),
+    });
+    adapter.setRoutes(LINES, POINTS);
+    adapter.setHeatmap({
+      cells: [
+        {
+          cellId: 'cell-1',
+          longitude: -87.0,
+          latitude: 41.0,
+          risk: 'HIGH',
+          riskScore: 3,
+          riskReasons: ['wind 38 mph'],
+          windMph: 38,
+          rainInchesPerHour: 0,
+          snowInchesPerHour: 0,
+        },
+      ],
+      bounds: null,
+      forecastStart: '',
+      forecastEnd: '',
+    });
+    const handler = map.handlers.find(
+      (entry) => entry.event === 'click' && entry.layer === 'trucksafe-heatmap',
+    )?.fn as ((event: unknown) => void) | undefined;
+    handler?.({
+      features: [
+        {
+          properties: { cellId: 'cell-1' },
+          geometry: { coordinates: [-87.0, 41.0] },
+        },
+      ],
+    });
+    expect(seen).toEqual([{ cellId: 'cell-1', at: [-87.0, 41.0] }]);
+    adapter.destroy();
+  });
+
+  it('pans to a picked checkpoint, zooming in only when further out', async () => {
+    const { adapter, map } = await readyAdapter();
+    map.zoom = 5;
+    adapter.focusPoint([-87.63, 41.88]);
+    expect(map.easeToCalls).toEqual([{ center: [-87.63, 41.88], zoom: 10 }]);
+    map.zoom = 12;
+    adapter.focusPoint([-87.63, 41.88]);
+    expect(map.easeToCalls[1]).toEqual({ center: [-87.63, 41.88], zoom: 12 });
+    expect(map.jumpToCalls).toHaveLength(0);
     adapter.destroy();
   });
 

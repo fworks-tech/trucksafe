@@ -68,7 +68,7 @@ export function MapCheckpointDetail({
         </Box>
         {checkpoint.risk_reasons.length > 0 && (
           <Typography variant="caption" color="text.secondary">
-            {checkpoint.risk_reasons.join(', ')}
+            Why: {checkpoint.risk_reasons.join('; ')}
           </Typography>
         )}
         <Box>

@@ -12,6 +12,14 @@ interface RouteComparisonProps {
   recommendedRouteId: string | null;
   selectedRouteId: string | null;
   onSelectRoute: (routeId: string) => void;
+  /** Routes hidden from the map; empty shows all. */
+  hiddenRouteIds?: readonly string[];
+  /** Toggles one route's map visibility. */
+  onToggleRouteVisibility?: (routeId: string) => void;
+  /** Currently map-selected checkpoint, for the checkpoint lists. */
+  selectedCheckpointId?: string | null;
+  /** Checkpoint rows focus the map. */
+  onSelectCheckpoint?: (checkpointId: string) => void;
 }
 
 /**
@@ -24,6 +32,10 @@ export function RouteComparison({
   recommendedRouteId,
   selectedRouteId,
   onSelectRoute,
+  hiddenRouteIds = [],
+  onToggleRouteVisibility,
+  selectedCheckpointId = null,
+  onSelectCheckpoint,
 }: RouteComparisonProps): React.JSX.Element {
   const labels = routeLabelsById(routes);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -144,6 +156,10 @@ export function RouteComparison({
               recommended={route.id === recommendedRouteId}
               selected={route.id === selectedRouteId}
               onSelect={onSelectRoute}
+              hidden={hiddenRouteIds.includes(route.id)}
+              onToggleVisibility={onToggleRouteVisibility}
+              selectedCheckpointId={selectedCheckpointId}
+              onSelectCheckpoint={onSelectCheckpoint}
             />
           </Box>
         ))}

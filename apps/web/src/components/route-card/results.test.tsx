@@ -62,6 +62,23 @@ describe('RouteCard', () => {
     expect(screen.getByText('Not eligible')).toBeInTheDocument();
     expect(screen.queryByText('Recommended')).not.toBeInTheDocument();
   });
+
+  it('focuses the map when a sidebar checkpoint row is picked', async () => {
+    const user = userEvent.setup();
+    const seen: string[] = [];
+    const route = makeRoute('route-1');
+    renderWithProviders(
+      <RouteCard
+        route={route}
+        label="Route 1"
+        recommended={false}
+        onSelectCheckpoint={(id) => seen.push(id)}
+      />,
+    );
+    await user.click(screen.getByText('Checkpoints (3)'));
+    await user.click(screen.getByRole('button', { name: /25\.0 mi/ }));
+    expect(seen).toEqual([route.checkpoints[1]!.checkpoint_id]);
+  });
 });
 
 describe('RouteComparison', () => {
@@ -128,6 +145,29 @@ describe('RouteComparison', () => {
       />,
     );
     expect(screen.getAllByText('Selected')).toHaveLength(1);
+  });
+
+  it('toggles route visibility without changing selection', async () => {
+    const user = userEvent.setup();
+    const hidden: string[] = [];
+    const plan = makeRoutePlan();
+    const props = (hiddenIds: string[]): React.JSX.Element => (
+      <RouteComparison
+        routes={plan.routes}
+        recommendedRouteId={plan.recommended_route_id}
+        selectedRouteId="route-1"
+        onSelectRoute={() => {}}
+        hiddenRouteIds={hiddenIds}
+        onToggleRouteVisibility={(id) => hidden.push(id)}
+      />
+    );
+    const { rerender } = renderWithProviders(props([]));
+    expect(screen.getAllByRole('button', { name: 'Hide route' })).toHaveLength(3);
+    await user.click(screen.getAllByRole('button', { name: 'Hide route' })[0]!);
+    expect(hidden).toEqual(['route-1']);
+    rerender(props(['route-1']));
+    expect(screen.getAllByRole('button', { name: 'Show route' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Hide route' })).toHaveLength(2);
   });
 });
 
