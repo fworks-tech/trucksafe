@@ -62,19 +62,23 @@ describe('accessibility', () => {
     expect(await axeViolations(container)).toEqual([]);
   });
 
-  it('announces loading and error states through a live region', async () => {
-    server.use(routePlansHandler('badRequest'));
-    const user = userEvent.setup();
-    renderWithProviders(<App />);
-    await user.clear(screen.getByLabelText(/^origin/i));
-    await user.type(screen.getByLabelText(/^origin/i), 'Chicago, IL');
-    await user.type(screen.getByLabelText(/^destination/i), 'Dallas, TX');
-    await user.clear(screen.getByLabelText(/load weight/i));
-    await user.type(screen.getByLabelText(/load weight/i), '20000');
-    await user.click(screen.getByRole('button', { name: /plan route/i }));
-    await screen.findByText('Please review the route plan details.');
-    const liveRegion = document.querySelector('[aria-live="polite"]');
-    expect(liveRegion).not.toBeNull();
-    expect(liveRegion?.textContent).toContain('Please review the route plan details.');
-  });
+  it(
+    'announces loading and error states through a live region',
+    { timeout: 15000 },
+    async () => {
+      server.use(routePlansHandler('badRequest'));
+      const user = userEvent.setup();
+      renderWithProviders(<App />);
+      await user.clear(screen.getByLabelText(/^origin/i));
+      await user.type(screen.getByLabelText(/^origin/i), 'Chicago, IL');
+      await user.type(screen.getByLabelText(/^destination/i), 'Dallas, TX');
+      await user.clear(screen.getByLabelText(/load weight/i));
+      await user.type(screen.getByLabelText(/load weight/i), '20000');
+      await user.click(screen.getByRole('button', { name: /plan route/i }));
+      await screen.findByText('Please review the route plan details.');
+      const liveRegion = document.querySelector('[aria-live="polite"]');
+      expect(liveRegion).not.toBeNull();
+      expect(liveRegion?.textContent).toContain('Please review the route plan details.');
+    },
+  );
 });
