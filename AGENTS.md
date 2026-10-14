@@ -1,8 +1,8 @@
 # AGENTS.md
 
-## Repo status: design docs only — scaffolding in progress
+## Repo status: implemented slice — docs partially stale
 
-`apps/api` and `apps/web` are empty directories. There are no manifests, no CI, no Makefile, no docker-compose, no OpenAPI contract. The README and docs describe a **target** React + Django system that is not built. Commands shown in README/docs (`pip install`, `npm run dev`, `pytest`, `make test`, etc.) will fail until scaffolding lands — treat them as requirements, not verified tooling. `.env.example` and `docs/deployment.md` are empty stubs. No `.gitignore` exists yet; never commit `.env` or keys.
+`apps/api` (Django) and `apps/web` (React+Vite) are implemented with manifests, CI (`.github/workflows/ci.yml`), `.env.example` files, and a populated `docs/` tree. Still planned (not implemented): `packages/contracts/openapi.yaml`, Docker Compose, PostgreSQL/PostGIS, Redis, Celery, real weather provider, `GET` route-plan retrieval, rate limiting. Django apps live directly under `apps/api/` (flat layout: `risk/`, `routing/`, `providers/`, `route_plans/`, `health/`, `config/`) — there is no `apps/api/apps/` nesting. Never commit `.env` or keys.
 
 ## Implementation plan (approved — follow this ordering)
 

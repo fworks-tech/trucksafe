@@ -106,11 +106,14 @@ provider has no real adapter in this slice.
 - Material UI (+ Emotion)
 - Vitest + React Testing Library + MSW, Playwright, axe-core
 
-Weather heatmap and forecast slider visualization remain planned. The
+Weather heatmap and forecast slider visualization are implemented. The
 base route map and segment-level risk coloring are implemented with
 MapLibre GL JS (no Mapbox token required); segment risk is returned by
 the API as `risk_segments` and colored without recomputation on the
-client. See `apps/web/README.md` for setup and scope.
+client. The heatmap renders backend-classified risk cells from
+`GET /api/v1/route-plans/{id}/weather-grid?offset_hours={0..48}`, and the
+forecast slider (0–48 hours) refetches grid data per offset. See
+`apps/web/README.md` for setup and scope.
 
 ### Data and Infrastructure (Planned)
 
@@ -532,7 +535,9 @@ The map distinguishes the following states:
 | No Travel | Dark red |
 | Unavailable | Gray |
 
-> The heatmap is planned. It has not been implemented yet.
+> The heatmap is implemented: risk cells come from
+> `GET /api/v1/route-plans/{id}/weather-grid`, and the 0–48 hour forecast
+> slider refetches data per offset (results are cached per plan+offset).
 
 ---
 
@@ -603,13 +608,20 @@ perform no network calls.
 
 ### Planned Endpoints
 
-`GET` route-plan retrieval and weather-grid endpoints are not
-implemented yet:
+`GET` route-plan retrieval is not implemented yet:
 
 ```http
 GET /api/v1/route-plans/{route_plan_id}
+```
+
+The weather-grid endpoint is implemented:
+
+```http
 GET /api/v1/route-plans/{route_plan_id}/weather-grid?offset_hours=12
 ```
+
+See `docs/api.md` for the contract (`offset_hours` 0–48, `404` when the
+plan does not exist).
 
 ### Error Format
 
@@ -636,8 +648,9 @@ Errors use a consistent envelope:
 | `503` | Transient provider failures exhausted (`PROVIDER_UNAVAILABLE`) |
 
 Unexpected errors use Django's default `500` handling. `GET` retrieval
-and weather-grid endpoints are planned; no `404` or `502` mappings
-exist yet.
+is planned; the weather-grid endpoint maps `404` (`NOT_FOUND`), `400`
+(`INVALID_REQUEST`), `422` (`UNROUTABLE`), and `503`
+(`PROVIDER_UNAVAILABLE`).
 
 ---
 
@@ -736,7 +749,7 @@ superseded by a newer push to the same ref is cancelled automatically.
 - Structured error responses without stack traces
 - Restricted `ALLOWED_HOSTS` in production
 - Rate limiting for route-planning requests (planned)
-- CORS restricted to trusted frontend origins (planned)
+- CORS restricted to trusted frontend origins
 
 Never commit:
 
