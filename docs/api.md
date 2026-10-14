@@ -126,7 +126,7 @@ request repeats (same deterministic plan id, stored payload returned).
           "weather_available": true,
           "risk_level": "LOW",
           "risk_score": 1.0,
-          "risk_reasons": ["wind"]
+          "risk_reasons": ["wind 12 mph"]
         }
       ]
     }
@@ -312,7 +312,7 @@ offset from departure.
       "valid_at": "2026-10-09T14:00:00Z",
       "risk_level": "LOW",
       "risk_score": 1.0,
-      "risk_reasons": ["wind"],
+      "risk_reasons": ["wind 15.2 mph"],
       "weather": {
         "wind_mph": 15.2,
         "rain_inches_per_hour": 0.02,
