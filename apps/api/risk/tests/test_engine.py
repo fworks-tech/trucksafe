@@ -32,6 +32,23 @@ def test_clear_weather_with_normal_load_is_low() -> None:
     assert result.score == 1
 
 
+def test_reasons_round_observed_values_to_one_decimal() -> None:
+    """
+    Raw provider floats must not leak into user-facing reasons.
+    """
+    result = calculate_risk(
+        weather=WeatherObservation(
+            wind_mph=20.9492,
+            rain_inches_per_hour=0.0,
+            snow_inches_per_hour=0.0,
+        ),
+        load_weight_lb=10_000.0,
+    )
+
+    assert "wind 20.9 mph" in result.reasons
+    assert not any("20.9492" in reason for reason in result.reasons)
+
+
 def test_wind_at_55_mph_is_no_travel_for_any_load() -> None:
     """
     Wind at or above 55 mph always results in No Travel.

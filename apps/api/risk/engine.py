@@ -81,10 +81,12 @@ def calculate_risk(
 
     # Reasons carry the observed value, not just the factor name: a bare
     # "rain" never tells the reader whether it drizzled or poured.
+    # Values round to one decimal so popups stay readable (20.9 mph,
+    # never 20.9492 mph).
     measurements = {
-        "wind": f"{weather.wind_mph:g} mph",
-        "rain": f"{weather.rain_inches_per_hour:g} in/h",
-        "snow": f"{weather.snow_inches_per_hour:g} in/h",
+        "wind": f"{round(weather.wind_mph, 1):g} mph",
+        "rain": f"{round(weather.rain_inches_per_hour, 1):g} in/h",
+        "snow": f"{round(weather.snow_inches_per_hour, 1):g} in/h",
     }
     reasons = {
         f"{condition} {measurements[condition]}"
