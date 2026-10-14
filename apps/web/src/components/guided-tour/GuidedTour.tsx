@@ -300,7 +300,7 @@ export function GuidedTour({
         </Typography>
         <Typography id="guided-tour-body" variant="body2" sx={{ mt: 0.5, mb: 2 }}>
           {fallback
-            ? `${step.body} No route results yet — use the example trip below, or go back and press Plan route yourself.`
+            ? `${step.body} No route results yet. Use the example trip below, or go back and press Plan route yourself.`
             : step.body}
         </Typography>
         {(step.offerExample || fallback) && (
