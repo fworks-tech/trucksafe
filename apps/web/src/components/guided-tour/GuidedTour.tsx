@@ -169,11 +169,21 @@ export function GuidedTour({
     const vh = window.innerHeight;
     const rightX = rect.x + rect.width + 16;
     if (rightX + DIALOG_WIDTH <= vw - VIEWPORT_MARGIN) {
-      return { ...base, left: Math.max(rightX, VIEWPORT_MARGIN), top: VIEWPORT_MARGIN, maxHeight: vh - 2 * VIEWPORT_MARGIN };
+      return {
+        ...base,
+        left: Math.max(rightX, VIEWPORT_MARGIN),
+        top: VIEWPORT_MARGIN,
+        maxHeight: vh - 2 * VIEWPORT_MARGIN,
+      };
     }
     const leftX = rect.x - DIALOG_WIDTH - 16;
     if (leftX >= VIEWPORT_MARGIN) {
-      return { ...base, left: leftX, top: VIEWPORT_MARGIN, maxHeight: vh - 2 * VIEWPORT_MARGIN };
+      return {
+        ...base,
+        left: leftX,
+        top: VIEWPORT_MARGIN,
+        maxHeight: vh - 2 * VIEWPORT_MARGIN,
+      };
     }
     const fallbackLeft = Math.max(
       VIEWPORT_MARGIN,
