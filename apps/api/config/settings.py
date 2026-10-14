@@ -99,10 +99,14 @@ CORS_ALLOWED_ORIGIN_REGEXES: list[str] = _parse_allowed_hosts(
 CORS_ALLOW_HEADERS: list[str] = [*cors_default_headers, "x-request-id"]
 
 # Provider selection. ``osrm`` resolves to the road-following OSRM/Photon
+# adapter (no credentials) and ``openmeteo`` to the Open-Meteo forecast
 # adapter (no credentials); a dotted path selects any custom adapter;
 # unset keeps the deterministic mocks. The factory instantiates whatever
 # is configured, so no view or service code changes with the provider.
-_PROVIDER_ALIASES = {"osrm": "providers.osrm_routing.OsrmRoutingProvider"}
+_PROVIDER_ALIASES = {
+    "osrm": "providers.osrm_routing.OsrmRoutingProvider",
+    "openmeteo": "providers.openmeteo_weather.OpenMeteoWeatherProvider",
+}
 
 
 def _resolve_provider(raw: str | None) -> str | None:

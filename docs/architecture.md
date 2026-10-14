@@ -123,9 +123,10 @@ class WeatherProvider:
 ```
 
 Provider adapters are resolved through small factories
-(`providers/factory.py`): the deterministic mocks by default, or a
-dotted import path / callable from `settings.TRUCKSAFE_ROUTING_PROVIDER`
-and `settings.TRUCKSAFE_WEATHER_PROVIDER` for real adapters later.
+(`providers/factory.py`): the deterministic mocks by default, a dotted
+import path / callable from `settings.TRUCKSAFE_ROUTING_PROVIDER`
+and `settings.TRUCKSAFE_WEATHER_PROVIDER`, or the built-in `osrm`
+(road-following routing) and `openmeteo` (forecast weather) aliases.
 Views and readiness checks share this seam, so there is exactly one
 wiring path. Adapters are responsible for:
 

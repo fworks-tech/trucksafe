@@ -140,7 +140,7 @@ docker run -e ALLOWED_HOSTS=localhost -e DJANGO_SECRET_KEY=dev-only \
 | `DJANGO_SECRET_KEY` | secret | From Secrets Manager/SSM; required when `DEBUG=false` |
 | `ALLOWED_HOSTS` | `<service-url>,<amplify-domain>` | Comma-separated; empty default rejects all hosts when `DEBUG=false` |
 | `TRUCKSAFE_ROUTING_PROVIDER` | blank (mock) | Set `osrm` only for the road-following mode (needs outbound internet, no credentials) |
-| `TRUCKSAFE_WEATHER_PROVIDER` | blank | Mock-only in this slice |
+| `TRUCKSAFE_WEATHER_PROVIDER` | blank (mock) | Set `openmeteo` for the Open-Meteo forecast adapter (needs outbound internet, no credentials) |
 
 ### Frontend (Amplify)
 
@@ -170,7 +170,10 @@ follow-up, not a code change made here.
 - Real routing mode (`TRUCKSAFE_ROUTING_PROVIDER=osrm`): road-following
   OSRM/Photon over the public demo endpoints (internet egress required,
   no credentials); transient failures surface as documented `503`s.
-  A weather adapter beyond the mock does not exist yet.
+- Real weather mode (`TRUCKSAFE_WEATHER_PROVIDER=openmeteo`): hourly
+  wind/precipitation/snowfall from the Open-Meteo forecast API (internet
+  egress required, no credentials), converted to canonical units;
+  times past the 16-day horizon report unavailable weather.
 
 ### Rollback
 
