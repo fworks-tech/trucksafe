@@ -31,7 +31,7 @@ export function checkpointPopupText(
     `ETA ${formatEta(checkpoint.eta)}`,
   ];
   if (checkpoint.risk_reasons.length > 0) {
-    lines.push(checkpoint.risk_reasons.join('; '));
+    lines.push(...checkpoint.risk_reasons);
   }
   return lines.join('\n');
 }
@@ -46,7 +46,7 @@ export function heatCellPopupText(cell: MappableWeatherCell): string {
   // Reasons already carry observed values; raw measures only fill the
   // gap when the backend sent none.
   if (cell.riskReasons.length > 0) {
-    lines.push(cell.riskReasons.join('; '));
+    lines.push(...cell.riskReasons);
     return lines.join('\n');
   }
   if (cell.windMph !== null) lines.push(`Wind ${cell.windMph} mph`);

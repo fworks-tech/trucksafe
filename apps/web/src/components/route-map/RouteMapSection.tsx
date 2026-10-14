@@ -377,6 +377,7 @@ export function RouteMapSection({
             <MapCheckpointDetail
               checkpoint={selectedCheckpointPayload}
               role={selectedPoint.role}
+              routeId={selectedPoint.routeId}
               routeLabel={routeLabelsById(response.routes)[selectedPoint.routeId]}
               onClose={() => onSelectCheckpoint(null)}
             />

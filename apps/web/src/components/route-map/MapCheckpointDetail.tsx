@@ -11,6 +11,8 @@ import { WeatherStatus } from '../route-card/WeatherStatus';
 interface MapCheckpointDetailProps {
   checkpoint: CheckpointPayload;
   role: CheckpointRole;
+  /** Route id, used only if the human label is missing. */
+  routeId: string;
   /** Human route name ("Route 3"); the heading must name it. */
   routeLabel?: string;
   onClose: () => void;
@@ -25,14 +27,14 @@ interface MapCheckpointDetailProps {
 export function MapCheckpointDetail({
   checkpoint,
   role,
+  routeId,
   routeLabel,
   onClose,
 }: MapCheckpointDetailProps): React.JSX.Element {
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const heading =
-    routeLabel === undefined
-      ? `Checkpoint ${checkpoint.sequence} of route`
-      : `Checkpoint ${checkpoint.sequence} of ${routeLabel}`;
+  // The label names the route; the raw id is the fallback so the heading
+  // never degrades to "of route" even for a stale selection.
+  const heading = `Checkpoint ${checkpoint.sequence} of ${routeLabel ?? routeId}`;
 
   useEffect(() => {
     headingRef.current?.focus();

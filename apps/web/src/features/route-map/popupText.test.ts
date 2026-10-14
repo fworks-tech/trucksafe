@@ -27,6 +27,14 @@ describe('checkpointPopupText', () => {
     );
   });
 
+  it('puts each reason on its own line', () => {
+    expect(
+      checkpointPopupText(checkpoint({ risk_reasons: ['wind 35 mph', 'rain 0.3 in/h'] })),
+    ).toBe(
+      'Checkpoint 3\nLow risk · 25.0 mi from origin\nETA 14 Oct 2026, 02:07 UTC\nwind 35 mph\nrain 0.3 in/h',
+    );
+  });
+
   it('falls back when weather is unavailable', () => {
     expect(
       checkpointPopupText(

@@ -35,6 +35,10 @@ function roleOf(index: number, total: number): 'origin' | 'destination' | null {
   return null;
 }
 
+/** Expanded list height cap (px): a long checkpoint list scrolls inside
+ * instead of stretching its card and the carousel track around it. */
+const CHECKPOINT_LIST_MAX_HEIGHT = 320;
+
 /** Ordered checkpoint details; safe fallbacks for every optional field. */
 export function CheckpointList({
   checkpoints,
@@ -57,7 +61,7 @@ export function CheckpointList({
         <List
           disablePadding
           aria-label={`Checkpoints for ${routeId}`}
-          sx={{ overflowY: 'auto', maxHeight: 320 }}
+          sx={{ overflowY: 'auto', maxHeight: CHECKPOINT_LIST_MAX_HEIGHT }}
         >
           {checkpoints.map((checkpoint, index) => {
             const role = roleOf(index, checkpoints.length);
