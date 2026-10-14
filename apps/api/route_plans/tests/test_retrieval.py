@@ -48,6 +48,7 @@ def test_get_unknown_id_returns_404_envelope(client: APIClient) -> None:
     error = response.json()["error"]
     assert error["code"] == "NOT_FOUND"
     assert error["request_id"]
+    assert response["X-Request-ID"] == error["request_id"]
 
 
 @pytest.mark.django_db

@@ -608,7 +608,7 @@ perform no network calls.
 
 Route plans persist as immutable snapshots keyed by the deterministic
 plan id, so an equivalent repeat `POST` returns the stored payload
-(`200`) instead of recomputing. Retrieve a stored plan:
+(`200`). Retrieve a stored plan:
 
 ```http
 GET /api/v1/route-plans/{route_plan_id}

@@ -124,9 +124,8 @@ class RoutePlanDetailView(APIView):
     def get(self, request: Request, route_plan_id: str) -> Response:
         """Return the stored plan, or 404 when the id is unknown."""
         request_id = getattr(request, "request_id", uuid.uuid4().hex)
-        try:
-            plan = RoutePlan.objects.get(plan_id=route_plan_id)
-        except RoutePlan.DoesNotExist:
+        plan = _get_plan(route_plan_id)
+        if plan is None:
             return error_response(
                 "NOT_FOUND",
                 f"Route plan {route_plan_id} not found",
@@ -136,6 +135,14 @@ class RoutePlanDetailView(APIView):
         return Response(plan.response, status=HTTP_200_OK)
 
 
+def _get_plan(route_plan_id: str) -> RoutePlan | None:
+    """Return the stored plan, or None when the id is unknown."""
+    try:
+        return RoutePlan.objects.get(plan_id=route_plan_id)
+    except RoutePlan.DoesNotExist:
+        return None
+
+
 class WeatherGridView(APIView):
     """Retrieve the weather grid for a route plan at a forecast offset."""
 
@@ -143,9 +150,8 @@ class WeatherGridView(APIView):
         """Return the weather grid for the given route plan and offset."""
         request_id = getattr(request, "request_id", uuid.uuid4().hex)
 
-        try:
-            plan = RoutePlan.objects.get(plan_id=route_plan_id)
-        except RoutePlan.DoesNotExist:
+        plan = _get_plan(route_plan_id)
+        if plan is None:
             return error_response(
                 "NOT_FOUND",
                 f"Route plan {route_plan_id} not found",
