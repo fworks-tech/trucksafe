@@ -99,7 +99,7 @@ export function buildTourSteps(context: TourContext): TourStep[] {
       id: 'risk',
       target: 'route-cards',
       title: 'Risk details and arrival times',
-      body: 'Each card summarizes a route\u2019s weather risk. Expand Checkpoints on a card to see every checkpoint\u2019s arrival time, risk level, and the reason behind it. For reference, Severe starts at 45 mph wind, 0.50 in/h rain, and 2.0 in/h snow, while No Travel starts at 55 mph, above 1.00 in/h, and above 3.0.',
+      body: 'Each card summarizes a route\u2019s weather risk. Expand Checkpoints on a card to see every checkpoint\u2019s arrival time, risk level, and the reason behind it. The bands behind those levels: wind Low below 25 mph, Moderate 25 to 34, High 35 to 44, Severe 45 to 54, No Travel at 55 or more; rain Low below 0.10 in/h, Moderate 0.10 to 0.25, High 0.25 to 0.50, Severe 0.50 to 1.00, No Travel above 1.00; snow Low below 0.5 in/h, Moderate 0.5 to 1.0, High 1.0 to 2.0, Severe 2.0 to 3.0, No Travel above 3.0.',
       requiresResults: true,
       offerExample: false,
     },
