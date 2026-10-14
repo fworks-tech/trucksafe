@@ -5,11 +5,16 @@ import { formatEta, formatMiles } from '../../lib/format';
 import type { CheckpointRole } from '../../features/route-map/geo';
 import type { CheckpointPayload } from '../../features/route-planning/types';
 import { RiskBadge } from '../route-card/RiskBadge';
+import { RiskReasons } from '../route-card/RiskReasons';
 import { WeatherStatus } from '../route-card/WeatherStatus';
 
 interface MapCheckpointDetailProps {
   checkpoint: CheckpointPayload;
   role: CheckpointRole;
+  /** Route id, used only if the human label is missing. */
+  routeId: string;
+  /** Human route name ("Route 3"); the heading must name it. */
+  routeLabel?: string;
   onClose: () => void;
 }
 
@@ -22,9 +27,14 @@ interface MapCheckpointDetailProps {
 export function MapCheckpointDetail({
   checkpoint,
   role,
+  routeId,
+  routeLabel,
   onClose,
 }: MapCheckpointDetailProps): React.JSX.Element {
   const headingRef = useRef<HTMLHeadingElement>(null);
+  // The label names the route; the raw id is the fallback so the heading
+  // never degrades to "of route" even for a stale selection.
+  const heading = `Checkpoint ${checkpoint.sequence} of ${routeLabel ?? routeId}`;
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -33,7 +43,7 @@ export function MapCheckpointDetail({
   return (
     <Box
       component="section"
-      aria-label={`Checkpoint ${checkpoint.sequence} details`}
+      aria-label={`${heading} details`}
       sx={{ border: '1px solid #cfd8dc', borderRadius: 2, p: 2 }}
     >
       <Stack spacing={1}>
@@ -45,7 +55,7 @@ export function MapCheckpointDetail({
             tabIndex={-1}
             sx={{ '&:focus': { outline: 'none' } }}
           >
-            Checkpoint {checkpoint.sequence} of route
+            {heading}
           </Typography>
           {role !== 'via' && (
             <Chip
@@ -66,11 +76,7 @@ export function MapCheckpointDetail({
             <WeatherStatus available={false} />
           )}
         </Box>
-        {checkpoint.risk_reasons.length > 0 && (
-          <Typography variant="caption" color="text.secondary">
-            Why: {checkpoint.risk_reasons.join('; ')}
-          </Typography>
-        )}
+        <RiskReasons reasons={checkpoint.risk_reasons} />
         <Box>
           <Button type="button" variant="outlined" size="small" onClick={onClose}>
             Close checkpoint details

@@ -23,7 +23,15 @@ function checkpoint(overrides: Partial<CheckpointPayload> = {}): CheckpointPaylo
 describe('checkpointPopupText', () => {
   it('names the checkpoint, risk, distance, ETA, and reason', () => {
     expect(checkpointPopupText(checkpoint())).toBe(
-      'Checkpoint 3 · Low risk · 25.0 mi from origin · ETA 14 Oct 2026, 02:07 UTC · rain 0.1 in/h',
+      'Checkpoint 3\nLow risk · 25.0 mi from origin\nETA 14 Oct 2026, 02:07 UTC\nrain 0.1 in/h',
+    );
+  });
+
+  it('puts each reason on its own line', () => {
+    expect(
+      checkpointPopupText(checkpoint({ risk_reasons: ['wind 35 mph', 'rain 0.3 in/h'] })),
+    ).toBe(
+      'Checkpoint 3\nLow risk · 25.0 mi from origin\nETA 14 Oct 2026, 02:07 UTC\nwind 35 mph\nrain 0.3 in/h',
     );
   });
 
@@ -33,13 +41,13 @@ describe('checkpointPopupText', () => {
         checkpoint({ weather_available: false, risk_level: null, risk_reasons: [] }),
       ),
     ).toBe(
-      'Checkpoint 3 · Weather unavailable · 25.0 mi from origin · ETA 14 Oct 2026, 02:07 UTC',
+      'Checkpoint 3\nWeather unavailable · 25.0 mi from origin\nETA 14 Oct 2026, 02:07 UTC',
     );
   });
 
   it('prefixes the route label when the caller knows it', () => {
     expect(checkpointPopupText(checkpoint(), 'Route 2')).toBe(
-      'Route 2 · Checkpoint 3 · Low risk · 25.0 mi from origin · ETA 14 Oct 2026, 02:07 UTC · rain 0.1 in/h',
+      'Route 2 · Checkpoint 3\nLow risk · 25.0 mi from origin\nETA 14 Oct 2026, 02:07 UTC\nrain 0.1 in/h',
     );
   });
 });
@@ -57,7 +65,7 @@ describe('heatCellPopupText', () => {
       rainInchesPerHour: 0,
       snowInchesPerHour: null,
     };
-    expect(heatCellPopupText(cell)).toBe('Forecast · High risk · wind 38 mph');
+    expect(heatCellPopupText(cell)).toBe('Forecast\nHigh risk\nwind 38 mph');
   });
 
   it('falls back to raw measures when no reasons were sent', () => {
@@ -73,7 +81,7 @@ describe('heatCellPopupText', () => {
       snowInchesPerHour: null,
     };
     expect(heatCellPopupText(cell)).toBe(
-      'Forecast · Moderate risk · Wind 28 mph · Rain 0.1 in/h',
+      'Forecast\nModerate risk\nWind 28 mph\nRain 0.1 in/h',
     );
   });
 
@@ -89,6 +97,6 @@ describe('heatCellPopupText', () => {
       rainInchesPerHour: null,
       snowInchesPerHour: null,
     };
-    expect(heatCellPopupText(cell)).toBe('Forecast · Weather unavailable');
+    expect(heatCellPopupText(cell)).toBe('Forecast\nWeather unavailable');
   });
 });

@@ -375,6 +375,9 @@ describe('RouteMapSection', () => {
     // Route 2's checkpoint sits 100 mi further: the detail must show the
     // picked route's data, not route 1's same-id checkpoint.
     expect(await screen.findByText(/125\.0 mi from origin/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /checkpoint 2 of route 2/i }),
+    ).toBeInTheDocument();
   });
 
   it('falls back accessibly when no route has geometry', () => {
