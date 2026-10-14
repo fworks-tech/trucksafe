@@ -132,6 +132,10 @@ export function RouteComparison({
         }}
         sx={{
           display: 'flex',
+          // Slides keep their own height: without this, every slide
+          // stretches to the tallest card and short cards sit in a
+          // tall empty frame.
+          alignItems: 'flex-start',
           gap: 2,
           overflowX: many ? 'auto' : 'hidden',
           scrollSnapType: 'x mandatory',
