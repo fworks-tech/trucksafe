@@ -1,4 +1,6 @@
 import { ThemeProvider } from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, type RenderOptions, type RenderResult } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
@@ -24,7 +26,11 @@ export function renderWithProviders(
   function Providers({ children }: { children: ReactNode }): React.JSX.Element {
     return (
       <QueryClientProvider client={client}>
-        <ThemeProvider theme={theme}>{children}</ThemeProvider>
+        <ThemeProvider theme={theme}>
+          <LocalizationProvider dateAdapter={AdapterDateFns}>
+            {children}
+          </LocalizationProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     );
   }
