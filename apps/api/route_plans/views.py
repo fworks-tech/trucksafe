@@ -1,4 +1,4 @@
-"""HTTP layer for POST /api/v1/route-plans.
+"""HTTP layer for /api/v1/route-plans.
 
 Views translate HTTP into service calls and domain results into
 responses. Provider errors map to the documented error envelope, and
@@ -116,6 +116,24 @@ class RoutePlanCreateView(APIView):
             plan.response if not created else payload,
             status=HTTP_201_CREATED if created else HTTP_200_OK,
         )
+
+
+class RoutePlanDetailView(APIView):
+    """Retrieve the stored payload of a computed route plan."""
+
+    def get(self, request: Request, route_plan_id: str) -> Response:
+        """Return the stored plan, or 404 when the id is unknown."""
+        request_id = getattr(request, "request_id", uuid.uuid4().hex)
+        try:
+            plan = RoutePlan.objects.get(plan_id=route_plan_id)
+        except RoutePlan.DoesNotExist:
+            return error_response(
+                "NOT_FOUND",
+                f"Route plan {route_plan_id} not found",
+                HTTP_404_NOT_FOUND,
+                request_id,
+            )
+        return Response(plan.response, status=HTTP_200_OK)
 
 
 class WeatherGridView(APIView):

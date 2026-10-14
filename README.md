@@ -68,9 +68,6 @@ Run the backend suite with `python -m pytest` from `apps/api` (see Testing Strat
 ### Planned (Not Implemented Yet)
 
 - OpenAPI contract in `packages/contracts/openapi.yaml`
-- Real weather provider adapter (routing has an optional OSRM/Photon
-  adapter; weather is mock-only)
-- `GET` route-plan retrieval endpoint
 - PostgreSQL/PostGIS persistence, Redis caching, Celery tasks
 - Backend Dockerfile (`apps/api/Dockerfile`, App Runner-ready); Docker
   Compose and CD workflows still planned (CI runs backend, web, and e2e checks)
@@ -79,8 +76,9 @@ Run the backend suite with `python -m pytest` from `apps/api` (see Testing Strat
 Routing and weather run on deterministic mock providers by default and
 need no external services or credentials. Setting
 `TRUCKSAFE_ROUTING_PROVIDER=osrm` selects the road-following OSRM/Photon
-routing adapter (internet access required, no credentials); the weather
-provider has no real adapter in this slice.
+routing adapter and `TRUCKSAFE_WEATHER_PROVIDER=openmeteo` selects the
+Open-Meteo forecast adapter (both need internet, neither needs
+credentials).
 
 ---
 
@@ -549,7 +547,7 @@ The API will use versioned endpoints under:
 /api/v1
 ```
 
-> `POST /api/v1/route-plans`, `GET /api/v1/health`, and `GET /api/v1/ready` are implemented. The contract is defined in [docs/api.md](docs/api.md); the OpenAPI document in `packages/contracts/openapi.yaml` is still planned.
+> `POST /api/v1/route-plans`, `GET /api/v1/route-plans/{route_plan_id}`, `GET /api/v1/health`, and `GET /api/v1/ready` are implemented. The contract is defined in [docs/api.md](docs/api.md); the OpenAPI document in `packages/contracts/openapi.yaml` is still planned.
 
 ### Create a Route Plan
 
@@ -606,9 +604,11 @@ state (`database`, `routing_provider`, `weather_provider`): `200`
 checks verify the configured adapter wiring; the deterministic mocks
 perform no network calls.
 
-### Planned Endpoints
+### Stored Plan Endpoints
 
-`GET` route-plan retrieval is not implemented yet:
+Route plans persist as immutable snapshots keyed by the deterministic
+plan id, so an equivalent repeat `POST` returns the stored payload
+(`200`) instead of recomputing. Retrieve a stored plan:
 
 ```http
 GET /api/v1/route-plans/{route_plan_id}

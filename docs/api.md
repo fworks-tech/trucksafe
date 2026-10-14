@@ -279,6 +279,16 @@ The backend validates:
 - Checkpoint interval is `10`, `25`, or `50`.
 - Provider response structures match the expected schema before use.
 
+## Retrieve a Route Plan
+
+```http
+GET /route-plans/{route_plan_id}
+```
+
+Returns the stored payload of a computed plan — the exact body `POST`
+returned, without recomputing. Unknown ids fail with `404` and the
+standard error envelope (`NOT_FOUND`).
+
 ## Weather Grid
 
 ```http
