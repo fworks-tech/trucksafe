@@ -105,14 +105,14 @@ request repeats (same deterministic plan id, stored payload returned).
           "end_index": 1,
           "risk_level": "LOW",
           "risk_score": 1.0,
-          "risk_reasons": ["wind"]
+          "risk_reasons": ["wind 12 mph"]
         },
         {
           "start_index": 1,
           "end_index": 2,
           "risk_level": "HIGH",
           "risk_score": 3.0,
-          "risk_reasons": ["wind", "rain"]
+          "risk_reasons": ["wind 38 mph", "rain 0.3 in/h"]
         }
       ],
       "checkpoints": [
