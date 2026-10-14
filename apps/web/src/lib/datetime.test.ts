@@ -100,4 +100,9 @@ describe('toLocalDate', () => {
     expect(toLocalDate('tomorrow at noon')).toBeNull();
     expect(toLocalDate('2026-13-12T14:30')).toBeNull();
   });
+
+  it('rejects overflow dates instead of rolling into the next month', () => {
+    // 30 Feb would otherwise become 2 Mar and display the wrong day.
+    expect(toLocalDate('2026-02-30T10:00')).toBeNull();
+  });
 });

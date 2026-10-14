@@ -69,7 +69,19 @@ export function toLocalDate(value: string): Date | null {
   const parts = parseLocalParts(value);
   if (parts === null) return null;
   const date = new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
-  return Number.isNaN(date.getTime()) ? null : date;
+  if (Number.isNaN(date.getTime())) return null;
+  // Same round-trip guard as `toUtcIso`: overflow dates (Feb 30) and
+  // nonexistent DST gap times must not silently become another day.
+  if (
+    date.getFullYear() !== parts.year ||
+    date.getMonth() !== parts.month - 1 ||
+    date.getDate() !== parts.day ||
+    date.getHours() !== parts.hour ||
+    date.getMinutes() !== parts.minute
+  ) {
+    return null;
+  }
+  return date;
 }
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
