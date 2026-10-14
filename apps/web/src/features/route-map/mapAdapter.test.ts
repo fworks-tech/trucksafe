@@ -187,6 +187,7 @@ import {
   type CheckpointEntry,
   type RouteLineEntry,
 } from './mapAdapter';
+import type { CheckpointSelection } from './geo';
 
 describe('lineStyleFor', () => {
   it('never emits a match-expression label (only plain per-feature values)', () => {
@@ -411,16 +412,18 @@ describe('RouteMapAdapter layers', () => {
   it('updates selection filters without refitting the viewport', async () => {
     const { adapter, map } = await readyAdapter();
     adapter.setRoutes(LINES, POINTS);
-    adapter.setSelected('route-2', 'cp-2');
+    adapter.setSelected('route-2', { routeId: 'route-2', checkpointId: 'cp-2' });
     expect(map.filters['trucksafe-route-selected']).toEqual([
       '==',
       ['get', 'routeId'],
       'route-2',
     ]);
+    // Checkpoint ids repeat across routes, so the highlight filter also
+    // pins the route; otherwise every same-id marker would light up.
     expect(map.filters['trucksafe-checkpoint-selected']).toEqual([
-      '==',
-      ['get', 'checkpointId'],
-      'cp-2',
+      'all',
+      ['==', ['get', 'routeId'], 'route-2'],
+      ['==', ['get', 'checkpointId'], 'cp-2'],
     ]);
     expect(map.fitBoundsCalls).toHaveLength(0);
     adapter.destroy();
@@ -429,7 +432,7 @@ describe('RouteMapAdapter layers', () => {
   it('hides routes and checkpoints while keeping selection state', async () => {
     const { adapter, map } = await readyAdapter();
     adapter.setRoutes(LINES, POINTS);
-    adapter.setSelected('route-1', 'cp-1');
+    adapter.setSelected('route-1', { routeId: 'route-1', checkpointId: 'cp-1' });
     adapter.setHiddenRoutes(['route-2']);
     const hidden = ['!in', ['get', 'routeId'], ['literal', ['route-2']]];
     expect(map.filters['trucksafe-route-lines']).toEqual(hidden);
@@ -450,9 +453,9 @@ describe('RouteMapAdapter layers', () => {
   });
 
   it('reports checkpoint picks and leaves popup text to the caller', async () => {
-    const seen: string[] = [];
+    const seen: CheckpointSelection[] = [];
     const { adapter, map } = await readyAdapter({
-      onCheckpointSelect: (id) => seen.push(id),
+      onCheckpointSelect: (selection) => seen.push(selection),
     });
     adapter.setRoutes(LINES, POINTS);
     const handler = map.handlers.find(
@@ -461,12 +464,12 @@ describe('RouteMapAdapter layers', () => {
     handler?.({
       features: [
         {
-          properties: { checkpointId: 'cp-1' },
+          properties: { checkpointId: 'cp-1', routeId: 'route-1' },
           geometry: { coordinates: [-87.63, 41.88] },
         },
       ],
     });
-    expect(seen).toEqual(['cp-1']);
+    expect(seen).toEqual([{ routeId: 'route-1', checkpointId: 'cp-1' }]);
     // Public popup API never throws with caller-built text.
     adapter.showPopup([-87.63, 41.88], 'Checkpoint 1 · Low risk');
     adapter.closePopup();
@@ -565,12 +568,15 @@ describe('RouteMapAdapter layers', () => {
     pointClick?.fn({
       features: [
         {
-          properties: { checkpointId: 'cp-1' },
+          properties: { checkpointId: 'cp-1', routeId: 'route-1' },
           geometry: { coordinates: [-87.63, 41.88] },
         },
       ],
     } as never);
-    expect(onCheckpointSelect).toHaveBeenCalledWith('cp-1');
+    expect(onCheckpointSelect).toHaveBeenCalledWith({
+      routeId: 'route-1',
+      checkpointId: 'cp-1',
+    });
     adapter.destroy();
   });
 

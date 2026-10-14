@@ -3,6 +3,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 
 import { useRoutePlanMutation } from '../../features/route-planning/hooks/useRoutePlan';
 import { useWeatherGrid } from '../../features/route-map/useWeatherGrid';
+import type { CheckpointSelection } from '../../features/route-map/geo';
 import {
   DEFAULT_ORIGIN_CITY,
   lookupCityCoordinates,
@@ -46,7 +47,9 @@ export function RoutePlanPage(): React.JSX.Element {
   // from the backend recommendation; never stored server-side.
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   // Checkpoint picked in the map or a sidebar list; the map pans to it.
-  const [selectedCheckpointId, setSelectedCheckpointId] = useState<string | null>(null);
+  // Route-qualified: checkpoint ids repeat across routes.
+  const [selectedCheckpoint, setSelectedCheckpoint] =
+    useState<CheckpointSelection | null>(null);
   // Routes hidden from the map (cards stay visible); cleared per plan.
   const [hiddenRouteIds, setHiddenRouteIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'plan' | 'routes'>('plan');
@@ -94,7 +97,7 @@ export function RoutePlanPage(): React.JSX.Element {
     (values: RoutePlanFormValues) => {
       mutation.reset();
       setSelectedRouteId(null);
-      setSelectedCheckpointId(null);
+      setSelectedCheckpoint(null);
       setHiddenRouteIds([]);
       setActiveTab('plan');
       void mapChunk();
@@ -117,7 +120,7 @@ export function RoutePlanPage(): React.JSX.Element {
     abortRef.current?.abort();
     mutation.reset();
     setSelectedRouteId(null);
-    setSelectedCheckpointId(null);
+    setSelectedCheckpoint(null);
     setHiddenRouteIds([]);
     setActiveTab('plan');
   }, [mutation]);
@@ -143,8 +146,8 @@ export function RoutePlanPage(): React.JSX.Element {
     setSelectedRouteId(routeId);
   }, []);
 
-  const handleSelectCheckpoint = useCallback((checkpointId: string | null) => {
-    setSelectedCheckpointId(checkpointId);
+  const handleSelectCheckpoint = useCallback((selection: CheckpointSelection | null) => {
+    setSelectedCheckpoint(selection);
   }, []);
 
   const handleToggleRouteVisibility = useCallback((routeId: string) => {
@@ -195,7 +198,7 @@ export function RoutePlanPage(): React.JSX.Element {
               response={response}
               selectedRouteId={effectiveSelection}
               onSelectRoute={handleSelectRoute}
-              selectedCheckpointId={selectedCheckpointId}
+              selectedCheckpoint={selectedCheckpoint}
               onSelectCheckpoint={handleSelectCheckpoint}
               weatherGrid={forecast.weatherGrid}
               hiddenRouteIds={hiddenRouteIds}
@@ -339,7 +342,7 @@ export function RoutePlanPage(): React.JSX.Element {
                     onSelectRoute={handleSelectRoute}
                     hiddenRouteIds={hiddenRouteIds}
                     onToggleRouteVisibility={handleToggleRouteVisibility}
-                    selectedCheckpointId={selectedCheckpointId}
+                    selectedCheckpoint={selectedCheckpoint}
                     onSelectCheckpoint={handleSelectCheckpoint}
                   />
                   <ForecastSection

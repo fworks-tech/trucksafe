@@ -3,6 +3,7 @@ import { Box, Button, Card, CardContent, Chip, Stack, Typography } from '@mui/ma
 import { statusTokens } from '../../app/theme';
 import { formatDuration, formatMiles, formatScore } from '../../lib/format';
 import { worstRiskLevel } from '../../features/route-planning/risk';
+import type { CheckpointSelection } from '../../features/route-map/geo';
 import type { RoutePayload } from '../../features/route-planning/types';
 import { CheckpointList } from './CheckpointList';
 import { EligibilityBadge } from './EligibilityBadge';
@@ -23,9 +24,9 @@ interface RouteCardProps {
   /** When provided, the card offers a map visibility toggle. */
   onToggleVisibility?: (routeId: string) => void;
   /** Currently map-selected checkpoint, for the checkpoint list. */
-  selectedCheckpointId?: string | null;
+  selectedCheckpoint?: CheckpointSelection | null;
   /** When provided, checkpoint rows focus the map. */
-  onSelectCheckpoint?: (checkpointId: string) => void;
+  onSelectCheckpoint?: (selection: CheckpointSelection) => void;
 }
 
 /** One route alternative. Ineligible routes are never shown as recommended.
@@ -44,7 +45,7 @@ export function RouteCard({
   onSelect,
   hidden = false,
   onToggleVisibility,
-  selectedCheckpointId = null,
+  selectedCheckpoint = null,
   onSelectCheckpoint,
 }: RouteCardProps): React.JSX.Element {
   const showRecommended = recommended && route.is_eligible;
@@ -95,6 +96,7 @@ export function RouteCard({
             )}
             {!route.is_eligible && <EligibilityBadge isEligible={false} />}
             {showSelected && <Chip label="Selected" size="small" color="primary" />}
+            {hidden && <Chip label="Hidden from map" size="small" variant="outlined" />}
           </Box>
           <Typography variant="body2" color="text.secondary">
             {formatDuration(route.duration_seconds)} · {formatMiles(route.distance_miles)}
@@ -115,7 +117,7 @@ export function RouteCard({
           <CheckpointList
             checkpoints={route.checkpoints}
             routeId={route.id}
-            selectedCheckpointId={selectedCheckpointId}
+            selectedCheckpoint={selectedCheckpoint}
             onSelectCheckpoint={onSelectCheckpoint}
           />
           {(onSelect !== undefined || onToggleVisibility !== undefined) && (

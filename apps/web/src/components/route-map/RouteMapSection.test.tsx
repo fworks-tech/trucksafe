@@ -135,7 +135,12 @@ vi.mock('maplibre-gl', () => {
   };
 });
 
-import { makeRoute, makeRoutePlan } from '../../features/route-planning/fixtures';
+import {
+  makeCheckpoint,
+  makeRoute,
+  makeRoutePlan,
+} from '../../features/route-planning/fixtures';
+import type { CheckpointSelection } from '../../features/route-map/geo';
 import { renderWithProviders } from '../../../test/render';
 import { RouteMapSection } from './RouteMapSection';
 
@@ -159,7 +164,7 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
         weatherGrid={null}
-        selectedCheckpointId={null}
+        selectedCheckpoint={null}
         onSelectCheckpoint={() => {}}
       />,
     );
@@ -180,7 +185,7 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
         weatherGrid={null}
-        selectedCheckpointId={null}
+        selectedCheckpoint={null}
         onSelectCheckpoint={() => {}}
       />,
     );
@@ -209,7 +214,7 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-1"
         onSelectRoute={(id) => seen.push(id)}
         weatherGrid={null}
-        selectedCheckpointId={null}
+        selectedCheckpoint={null}
         onSelectCheckpoint={() => {}}
       />,
     );
@@ -231,7 +236,7 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-2"
         onSelectRoute={(id) => seen.push(id)}
         weatherGrid={null}
-        selectedCheckpointId={null}
+        selectedCheckpoint={null}
         onSelectCheckpoint={() => {}}
       />,
     );
@@ -251,7 +256,7 @@ describe('RouteMapSection', () => {
     const plan = makeRoutePlan();
     const firstCheckpoint = plan.routes[0]?.checkpoints[0];
     if (firstCheckpoint === undefined) throw new Error('fixture has no checkpoints');
-    let picked: string | null = null;
+    let picked: CheckpointSelection | null = null;
     const renderSection = (): void => {
       rerender(
         <RouteMapSection
@@ -259,9 +264,9 @@ describe('RouteMapSection', () => {
           selectedRouteId="route-1"
           onSelectRoute={() => {}}
           weatherGrid={null}
-          selectedCheckpointId={picked}
-          onSelectCheckpoint={(id) => {
-            picked = id;
+          selectedCheckpoint={picked}
+          onSelectCheckpoint={(selection) => {
+            picked = selection;
           }}
         />,
       );
@@ -272,9 +277,9 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
         weatherGrid={null}
-        selectedCheckpointId={picked}
-        onSelectCheckpoint={(id) => {
-          picked = id;
+        selectedCheckpoint={picked}
+        onSelectCheckpoint={(selection) => {
+          picked = selection;
         }}
       />,
     );
@@ -285,7 +290,10 @@ describe('RouteMapSection', () => {
     FakeMap.instances[0]?.clickLayer('trucksafe-checkpoints', {
       features: [
         {
-          properties: { checkpointId: firstCheckpoint.checkpoint_id },
+          properties: {
+            checkpointId: firstCheckpoint.checkpoint_id,
+            routeId: 'route-1',
+          },
           geometry: { coordinates: [-87.63, 41.88] },
         },
       ],
@@ -305,6 +313,70 @@ describe('RouteMapSection', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('resolves same-id checkpoints to the picked route', async () => {
+    // Production ids repeat per route (`cp-N`); a bare id would match
+    // the first route's checkpoint.
+    stubWebgl();
+    const shared = [
+      { ...makeCheckpoint({ distanceMiles: 0 }), checkpoint_id: 'cp-1', sequence: 1 },
+      { ...makeCheckpoint({ distanceMiles: 25 }), checkpoint_id: 'cp-2', sequence: 2 },
+    ];
+    const plan = makeRoutePlan({
+      routes: [
+        makeRoute('route-1', {
+          checkpoints: shared.map((checkpoint) => ({ ...checkpoint })),
+        }),
+        makeRoute('route-2', {
+          checkpoints: shared.map((checkpoint) => ({
+            ...checkpoint,
+            distance_miles: checkpoint.distance_miles + 100,
+          })),
+        }),
+      ],
+    });
+    let picked: CheckpointSelection | null = null;
+    const { rerender } = renderWithProviders(
+      <RouteMapSection
+        response={plan}
+        selectedRouteId="route-2"
+        onSelectRoute={() => {}}
+        weatherGrid={null}
+        selectedCheckpoint={picked}
+        onSelectCheckpoint={(selection) => {
+          picked = selection;
+        }}
+      />,
+    );
+    FakeMap.instances[0]?.emit('load');
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Loading map')).not.toBeInTheDocument();
+    });
+    FakeMap.instances[0]?.clickLayer('trucksafe-checkpoints', {
+      features: [
+        {
+          properties: { checkpointId: 'cp-2', routeId: 'route-2' },
+          geometry: { coordinates: [-87.63, 41.88] },
+        },
+      ],
+    });
+    expect(picked).toEqual({ routeId: 'route-2', checkpointId: 'cp-2' });
+    rerender(
+      <RouteMapSection
+        response={plan}
+        selectedRouteId="route-2"
+        onSelectRoute={() => {}}
+        weatherGrid={null}
+        selectedCheckpoint={picked}
+        onSelectCheckpoint={(selection) => {
+          picked = selection;
+        }}
+      />,
+    );
+    // Route 2's checkpoint sits 100 mi further: the detail must show the
+    // picked route's data, not route 1's same-id checkpoint.
+    expect(await screen.findByText(/125\.0 mi from origin/)).toBeInTheDocument();
+  });
+
   it('falls back accessibly when no route has geometry', () => {
     const plan = makeRoutePlan({
       routes: [makeRoute('route-1', { geometryNull: true })],
@@ -316,7 +388,7 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-1"
         onSelectRoute={(id) => seen.push(id)}
         weatherGrid={null}
-        selectedCheckpointId={null}
+        selectedCheckpoint={null}
         onSelectCheckpoint={() => {}}
       />,
     );
@@ -337,7 +409,7 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
         weatherGrid={null}
-        selectedCheckpointId={null}
+        selectedCheckpoint={null}
         onSelectCheckpoint={() => {}}
       />,
     );
@@ -357,7 +429,7 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
         weatherGrid={null}
-        selectedCheckpointId={null}
+        selectedCheckpoint={null}
         onSelectCheckpoint={() => {}}
       />,
     );
@@ -379,7 +451,7 @@ describe('RouteMapSection', () => {
         selectedRouteId="route-1"
         onSelectRoute={() => {}}
         weatherGrid={null}
-        selectedCheckpointId={null}
+        selectedCheckpoint={null}
         onSelectCheckpoint={() => {}}
       />,
     );

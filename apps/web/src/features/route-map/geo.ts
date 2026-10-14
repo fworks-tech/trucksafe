@@ -151,6 +151,13 @@ export interface MappableCheckpoint {
   role: CheckpointRole;
 }
 
+/** A checkpoint pick, qualified by route: backend ids (`cp-N`) repeat
+ * across routes, so a bare checkpoint id is ambiguous. */
+export interface CheckpointSelection {
+  routeId: string;
+  checkpointId: string;
+}
+
 export interface MappableRouteSegment {
   startIndex: number;
   endIndex: number;

@@ -14,6 +14,7 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 import { formatEta, formatMiles } from '../../lib/format';
+import type { CheckpointSelection } from '../../features/route-map/geo';
 import type { CheckpointPayload } from '../../features/route-planning/types';
 import { RiskBadge } from './RiskBadge';
 import { WeatherStatus } from './WeatherStatus';
@@ -22,9 +23,9 @@ interface CheckpointListProps {
   checkpoints: CheckpointPayload[];
   routeId: string;
   /** Currently map-selected checkpoint, for `aria-current`. */
-  selectedCheckpointId?: string | null;
+  selectedCheckpoint?: CheckpointSelection | null;
   /** When provided, each row focuses its checkpoint on the map. */
-  onSelectCheckpoint?: (checkpointId: string) => void;
+  onSelectCheckpoint?: (selection: CheckpointSelection) => void;
 }
 
 function roleOf(index: number, total: number): 'origin' | 'destination' | null {
@@ -37,7 +38,7 @@ function roleOf(index: number, total: number): 'origin' | 'destination' | null {
 export function CheckpointList({
   checkpoints,
   routeId,
-  selectedCheckpointId = null,
+  selectedCheckpoint = null,
   onSelectCheckpoint,
 }: CheckpointListProps): React.JSX.Element {
   if (checkpoints.length === 0) {
@@ -103,7 +104,12 @@ export function CheckpointList({
                 </ListItem>
               );
             }
-            const selected = checkpoint.checkpoint_id === selectedCheckpointId;
+            // The pick is route-qualified: checkpoint ids repeat
+            // across routes, so a bare id would highlight every
+            // same-sequence row.
+            const selected =
+              selectedCheckpoint?.routeId === routeId &&
+              selectedCheckpoint?.checkpointId === checkpoint.checkpoint_id;
             return (
               <ListItem
                 key={checkpoint.checkpoint_id}
@@ -113,7 +119,12 @@ export function CheckpointList({
                 <ListItemButton
                   selected={selected}
                   aria-current={selected || undefined}
-                  onClick={() => onSelectCheckpoint(checkpoint.checkpoint_id)}
+                  onClick={() =>
+                    onSelectCheckpoint({
+                      routeId,
+                      checkpointId: checkpoint.checkpoint_id,
+                    })
+                  }
                   sx={{ px: 0 }}
                 >
                   {content}

@@ -5,12 +5,14 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 
 import {
   normalizePlanMap,
+  type CheckpointSelection,
   type LngLat,
   type MappableCheckpoint,
   type NormalizedWeatherGrid,
 } from '../../features/route-map/geo';
 import { RouteMapAdapter } from '../../features/route-map/mapAdapter';
 import { mapStyleUrl } from '../../features/route-map/mapConfig';
+import { routeLabelsById } from '../../features/route-planning/labels';
 import {
   checkpointPopupText,
   heatCellPopupText,
@@ -27,8 +29,8 @@ interface RouteMapSectionProps {
   selectedRouteId: string | null;
   onSelectRoute: (routeId: string) => void;
   /** Checkpoint selected in the map or the sidebar list; null clears it. */
-  selectedCheckpointId: string | null;
-  onSelectCheckpoint: (checkpointId: string | null) => void;
+  selectedCheckpoint: CheckpointSelection | null;
+  onSelectCheckpoint: (selection: CheckpointSelection | null) => void;
   /** Latest forecast grid; the slider lives in the bottom sheet. */
   weatherGrid: NormalizedWeatherGrid | null;
   /** Routes hidden from the map (cards stay visible); empty shows all. */
@@ -54,7 +56,7 @@ export function RouteMapSection({
   response,
   selectedRouteId,
   onSelectRoute,
-  selectedCheckpointId,
+  selectedCheckpoint,
   onSelectCheckpoint,
   weatherGrid,
   hiddenRouteIds = [],
@@ -67,7 +69,18 @@ export function RouteMapSection({
   // Latest grid for heat-cell popups; a ref so map callbacks never go
   // stale without recreating the map.
   const weatherGridRef = useRef(weatherGrid);
-  weatherGridRef.current = weatherGrid;
+  // Selection refs so a retried creation restores the live pick instead
+  // of a stale closure value.
+  const selectedRouteRef = useRef(selectedRouteId);
+  const selectedCheckpointRef = useRef(selectedCheckpoint);
+
+  useEffect(() => {
+    weatherGridRef.current = weatherGrid;
+  }, [weatherGrid]);
+  useEffect(() => {
+    selectedRouteRef.current = selectedRouteId;
+    selectedCheckpointRef.current = selectedCheckpoint;
+  }, [selectedRouteId, selectedCheckpoint]);
 
   // Floating control visibility state.
   const [checkpointsVisible, setCheckpointsVisible] = useState(true);
@@ -110,8 +123,8 @@ export function RouteMapSection({
       onRouteSelect: (routeId) => {
         onSelectRoute(routeId);
       },
-      onCheckpointSelect: (checkpointId) => {
-        onSelectCheckpoint(checkpointId);
+      onCheckpointSelect: (selection) => {
+        onSelectCheckpoint(selection);
       },
       onHeatCellSelect: (cellId, at) => {
         const cell = weatherGridRef.current?.cells.find(
@@ -144,7 +157,7 @@ export function RouteMapSection({
             });
           }
           if (model.bounds !== null) adapter.fitToBounds(model.bounds);
-          adapter.setSelected(selectedRouteId, null);
+          adapter.setSelected(selectedRouteRef.current, selectedCheckpointRef.current);
         } catch {
           created = null;
           adapter.destroy();
@@ -175,9 +188,9 @@ export function RouteMapSection({
   // Selection emphasis without viewport refits.
   useEffect(() => {
     if (mapStatus === 'ready') {
-      adapterRef.current?.setSelected(selectedRouteId, selectedCheckpointId);
+      adapterRef.current?.setSelected(selectedRouteId, selectedCheckpoint);
     }
-  }, [mapStatus, selectedRouteId, selectedCheckpointId]);
+  }, [mapStatus, selectedRouteId, selectedCheckpoint]);
   // Route visibility without refits; hiding never changes the selection.
   useEffect(() => {
     if (mapStatus === 'ready') {
@@ -185,32 +198,39 @@ export function RouteMapSection({
     }
   }, [mapStatus, hiddenRouteIds]);
 
-  const selectedCheckpoint: MappableCheckpoint | null =
-    selectedCheckpointId === null
-      ? null
-      : (model.checkpoints.find((point) => point.checkpointId === selectedCheckpointId) ??
-        null);
-  const selectedCheckpointPayload =
+  const selectedPoint: MappableCheckpoint | null =
     selectedCheckpoint === null
       ? null
+      : (model.checkpoints.find(
+          (point) =>
+            point.routeId === selectedCheckpoint.routeId &&
+            point.checkpointId === selectedCheckpoint.checkpointId,
+        ) ?? null);
+  const selectedCheckpointPayload =
+    selectedPoint === null
+      ? null
       : (response.routes
-          .find((route) => route.id === selectedCheckpoint.routeId)
+          .find((route) => route.id === selectedPoint.routeId)
           ?.checkpoints.find(
-            (checkpoint) => checkpoint.checkpoint_id === selectedCheckpoint.checkpointId,
+            (checkpoint) => checkpoint.checkpoint_id === selectedPoint.checkpointId,
           ) ?? null);
 
   // Checkpoint picks (from the map or the sidebar list) pan the
   // viewport and raise a details popup; clearing the pick closes it.
   useEffect(() => {
     if (mapStatus !== 'ready') return;
-    if (selectedCheckpoint === null || selectedCheckpointPayload === null) {
+    if (selectedPoint === null || selectedCheckpointPayload === null) {
       adapterRef.current?.closePopup();
       return;
     }
-    const at: LngLat = [selectedCheckpoint.longitude, selectedCheckpoint.latitude];
+    const at: LngLat = [selectedPoint.longitude, selectedPoint.latitude];
     adapterRef.current?.focusPoint(at);
-    adapterRef.current?.showPopup(at, checkpointPopupText(selectedCheckpointPayload));
-  }, [mapStatus, selectedCheckpoint, selectedCheckpointPayload]);
+    const routeLabel = routeLabelsById(response.routes)[selectedPoint.routeId];
+    adapterRef.current?.showPopup(
+      at,
+      checkpointPopupText(selectedCheckpointPayload, routeLabel),
+    );
+  }, [mapStatus, response.routes, selectedPoint, selectedCheckpointPayload]);
 
   return (
     <Box
@@ -337,7 +357,7 @@ export function RouteMapSection({
             <RouteMapLegend defaultCollapsed={!isDesktop} />
           </Box>
         </Box>
-        {selectedCheckpoint !== null && selectedCheckpointPayload !== null && (
+        {selectedPoint !== null && selectedCheckpointPayload !== null && (
           <Box
             sx={{
               position: 'absolute',
@@ -350,7 +370,7 @@ export function RouteMapSection({
           >
             <MapCheckpointDetail
               checkpoint={selectedCheckpointPayload}
-              role={selectedCheckpoint.role}
+              role={selectedPoint.role}
               onClose={() => onSelectCheckpoint(null)}
             />
           </Box>

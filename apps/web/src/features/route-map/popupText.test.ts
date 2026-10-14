@@ -36,6 +36,12 @@ describe('checkpointPopupText', () => {
       'Checkpoint 3 · Weather unavailable · 25.0 mi from origin · ETA 14 Oct 2026, 02:07 UTC',
     );
   });
+
+  it('prefixes the route label when the caller knows it', () => {
+    expect(checkpointPopupText(checkpoint(), 'Route 2')).toBe(
+      'Route 2 · Checkpoint 3 · Low risk · 25.0 mi from origin · ETA 14 Oct 2026, 02:07 UTC · rain 0.1 in/h',
+    );
+  });
 });
 
 describe('heatCellPopupText', () => {

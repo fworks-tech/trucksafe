@@ -11,13 +11,18 @@ import { formatEta, formatMiles } from '../../lib/format';
 import type { MappableWeatherCell } from './geo';
 
 /** Checkpoint pick: identity, risk, distance, ETA, and the why. */
-export function checkpointPopupText(checkpoint: CheckpointPayload): string {
+export function checkpointPopupText(
+  checkpoint: CheckpointPayload,
+  routeLabel?: string,
+): string {
   const risk =
     checkpoint.weather_available && checkpoint.risk_level !== null
       ? `${RISK_LABELS[checkpoint.risk_level]} risk`
       : 'Weather unavailable';
   const parts = [
-    `Checkpoint ${checkpoint.sequence}`,
+    routeLabel === undefined
+      ? `Checkpoint ${checkpoint.sequence}`
+      : `${routeLabel} · Checkpoint ${checkpoint.sequence}`,
     risk,
     `${formatMiles(checkpoint.distance_miles)} from origin`,
     `ETA ${formatEta(checkpoint.eta)}`,

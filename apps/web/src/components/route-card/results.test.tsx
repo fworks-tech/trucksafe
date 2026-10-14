@@ -8,6 +8,7 @@ import {
   makeRoute,
   makeRoutePlan,
 } from '../../features/route-planning/fixtures';
+import type { CheckpointSelection } from '../../features/route-map/geo';
 import { CheckpointList } from './CheckpointList';
 import { RecommendationSummary } from './RecommendationSummary';
 import { RouteCard } from './RouteCard';
@@ -65,19 +66,40 @@ describe('RouteCard', () => {
 
   it('focuses the map when a sidebar checkpoint row is picked', async () => {
     const user = userEvent.setup();
-    const seen: string[] = [];
+    const seen: CheckpointSelection[] = [];
     const route = makeRoute('route-1');
     renderWithProviders(
       <RouteCard
         route={route}
         label="Route 1"
         recommended={false}
-        onSelectCheckpoint={(id) => seen.push(id)}
+        onSelectCheckpoint={(selection) => seen.push(selection)}
       />,
     );
     await user.click(screen.getByText('Checkpoints (3)'));
     await user.click(screen.getByRole('button', { name: /25\.0 mi/ }));
-    expect(seen).toEqual([route.checkpoints[1]!.checkpoint_id]);
+    // Route-qualified: the same `cp-N` ids exist on every route.
+    expect(seen).toEqual([
+      { routeId: 'route-1', checkpointId: route.checkpoints[1]!.checkpoint_id },
+    ]);
+  });
+
+  it('marks a hidden route explicitly without losing selection', () => {
+    const plan = makeRoutePlan();
+    renderWithProviders(
+      <RouteComparison
+        routes={plan.routes}
+        recommendedRouteId={plan.recommended_route_id}
+        selectedRouteId="route-1"
+        onSelectRoute={() => {}}
+        hiddenRouteIds={['route-1']}
+        onToggleRouteVisibility={() => {}}
+      />,
+    );
+    const card = document.querySelector('[data-route-id="route-1"]');
+    expect(card?.textContent).toMatch(/Hidden from map/);
+    // Selection stays: hiding never changes the selected route.
+    expect(card?.textContent).toMatch(/Selected/);
   });
 });
 

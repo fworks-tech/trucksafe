@@ -18,6 +18,7 @@ import {
 } from 'maplibre-gl';
 
 import type {
+  CheckpointSelection,
   LngLat,
   MappableCheckpoint,
   MappableRouteLine,
@@ -57,7 +58,8 @@ export type CheckpointEntry = MappableCheckpoint;
 
 export interface RouteMapCallbacks {
   onRouteSelect?: (routeId: string) => void;
-  onCheckpointSelect?: (checkpointId: string) => void;
+  /** Checkpoint picks carry their route: ids repeat across routes. */
+  onCheckpointSelect?: (selection: CheckpointSelection) => void;
   /** Heatmap cell pick: details come from the weather grid, not a route. */
   onHeatCellSelect?: (cellId: string, at: LngLat) => void;
   onRuntimeError?: () => void;
@@ -184,7 +186,7 @@ export class RouteMapAdapter {
   private lastBounds: MapBounds | null = null;
   private hiddenRouteIds: string[] = [];
   private selectedRouteId: string | null = null;
-  private selectedCheckpointId: string | null = null;
+  private selectedCheckpoint: CheckpointSelection | null = null;
 
   private constructor(
     private readonly map: MapLibreMap,
@@ -248,10 +250,11 @@ export class RouteMapAdapter {
     this.map.on('click', CHECKPOINT_LAYER, (event: MapLayerMouseEvent) => {
       const feature = event.features?.[0];
       const checkpointId = feature?.properties['checkpointId'];
+      const routeId = feature?.properties['routeId'];
       // Popup content comes from the caller (it owns the payload text);
       // the adapter only reports the pick.
-      if (typeof checkpointId === 'string') {
-        this.callbacks.onCheckpointSelect?.(checkpointId);
+      if (typeof checkpointId === 'string' && typeof routeId === 'string') {
+        this.callbacks.onCheckpointSelect?.({ routeId, checkpointId });
       }
     });
     this.map.on('click', HEATMAP_LAYER, (event: MapLayerMouseEvent) => {
@@ -504,9 +507,12 @@ export class RouteMapAdapter {
   }
 
   /** Emphasize the selected route and checkpoint without refitting. */
-  setSelected(selectedRouteId: string | null, checkpointId: string | null): void {
+  setSelected(
+    selectedRouteId: string | null,
+    selection: CheckpointSelection | null,
+  ): void {
     this.selectedRouteId = selectedRouteId;
-    this.selectedCheckpointId = checkpointId;
+    this.selectedCheckpoint = selection;
     if (!this.layersReady) return;
     this.applySelectionFilters();
   }
@@ -537,11 +543,15 @@ export class RouteMapAdapter {
       ['get', 'routeId'],
       this.selectedRouteId ?? '__none__',
     ]);
-    const checkpointSelected = asExpression<FilterSpecification>([
-      '==',
-      ['get', 'checkpointId'],
-      this.selectedCheckpointId ?? '__none__',
-    ]);
+    const checkpointSelected = asExpression<FilterSpecification>(
+      this.selectedCheckpoint === null
+        ? ['==', ['get', 'checkpointId'], '__none__']
+        : [
+            'all',
+            ['==', ['get', 'routeId'], this.selectedCheckpoint.routeId],
+            ['==', ['get', 'checkpointId'], this.selectedCheckpoint.checkpointId],
+          ],
+    );
     this.map.setFilter(
       ROUTE_SELECTED_LAYER,
       visibility === null
