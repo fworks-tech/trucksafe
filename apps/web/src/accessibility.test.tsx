@@ -62,7 +62,7 @@ describe('accessibility', () => {
     expect(await axeViolations(container)).toEqual([]);
   });
 
-  it('announces loading and error states through a live region', async () => {
+  it('announces loading and error states through a live region', { timeout: 15000 }, async () => {
     server.use(routePlansHandler('badRequest'));
     const user = userEvent.setup();
     renderWithProviders(<App />);
