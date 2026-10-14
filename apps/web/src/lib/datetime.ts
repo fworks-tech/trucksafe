@@ -59,6 +59,31 @@ export function parseLocalParts(value: string): LocalParts | null {
   return { year, month, day, hour, minute };
 }
 
+/**
+ * Parse a `datetime-local` input value (`YYYY-MM-DDTHH:mm`) into a Date in
+ * the user's local timezone, or null when invalid. Inverse of
+ * `toLocalInputValue`; used to bridge the string form model with the
+ * themed date/time picker, which works on Date objects.
+ */
+export function toLocalDate(value: string): Date | null {
+  const parts = parseLocalParts(value);
+  if (parts === null) return null;
+  const date = new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
+  if (Number.isNaN(date.getTime())) return null;
+  // Same round-trip guard as `toUtcIso`: overflow dates (Feb 30) and
+  // nonexistent DST gap times must not silently become another day.
+  if (
+    date.getFullYear() !== parts.year ||
+    date.getMonth() !== parts.month - 1 ||
+    date.getDate() !== parts.day ||
+    date.getHours() !== parts.hour ||
+    date.getMinutes() !== parts.minute
+  ) {
+    return null;
+  }
+  return date;
+}
+
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 
 /**

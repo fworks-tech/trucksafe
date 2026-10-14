@@ -102,6 +102,22 @@ const { FakeMap, FakeMarker, FakePopup, fakeState } = vi.hoisted(() => {
       this.filters[layer] = filter;
     }
 
+    zoom = 9;
+    easeToCalls: unknown[] = [];
+    jumpToCalls: unknown[] = [];
+
+    getZoom(): number {
+      return this.zoom;
+    }
+
+    easeTo(options: unknown): void {
+      this.easeToCalls.push(options);
+    }
+
+    jumpTo(options: unknown): void {
+      this.jumpToCalls.push(options);
+    }
+
     fitBounds(bounds: unknown, options: unknown): void {
       this.fitBoundsCalls.push({ bounds, options });
     }
@@ -171,6 +187,7 @@ import {
   type CheckpointEntry,
   type RouteLineEntry,
 } from './mapAdapter';
+import type { CheckpointSelection } from './geo';
 
 describe('lineStyleFor', () => {
   it('never emits a match-expression label (only plain per-feature values)', () => {
@@ -395,18 +412,118 @@ describe('RouteMapAdapter layers', () => {
   it('updates selection filters without refitting the viewport', async () => {
     const { adapter, map } = await readyAdapter();
     adapter.setRoutes(LINES, POINTS);
-    adapter.setSelected('route-2', 'cp-2');
+    adapter.setSelected('route-2', { routeId: 'route-2', checkpointId: 'cp-2' });
     expect(map.filters['trucksafe-route-selected']).toEqual([
       '==',
       ['get', 'routeId'],
       'route-2',
     ]);
+    // Checkpoint ids repeat across routes, so the highlight filter also
+    // pins the route; otherwise every same-id marker would light up.
     expect(map.filters['trucksafe-checkpoint-selected']).toEqual([
-      '==',
-      ['get', 'checkpointId'],
-      'cp-2',
+      'all',
+      ['==', ['get', 'routeId'], 'route-2'],
+      ['==', ['get', 'checkpointId'], 'cp-2'],
     ]);
     expect(map.fitBoundsCalls).toHaveLength(0);
+    adapter.destroy();
+  });
+
+  it('hides routes and checkpoints while keeping selection state', async () => {
+    const { adapter, map } = await readyAdapter();
+    adapter.setRoutes(LINES, POINTS);
+    adapter.setSelected('route-1', { routeId: 'route-1', checkpointId: 'cp-1' });
+    adapter.setHiddenRoutes(['route-2']);
+    const hidden = ['!in', ['get', 'routeId'], ['literal', ['route-2']]];
+    expect(map.filters['trucksafe-route-lines']).toEqual(hidden);
+    expect(map.filters['trucksafe-checkpoints']).toEqual(hidden);
+    expect(map.filters['trucksafe-route-selected']).toEqual([
+      'all',
+      ['==', ['get', 'routeId'], 'route-1'],
+      hidden,
+    ]);
+    adapter.setHiddenRoutes([]);
+    expect(map.filters['trucksafe-route-lines']).toBeNull();
+    expect(map.filters['trucksafe-route-selected']).toEqual([
+      '==',
+      ['get', 'routeId'],
+      'route-1',
+    ]);
+    adapter.destroy();
+  });
+
+  it('reports checkpoint picks and leaves popup text to the caller', async () => {
+    const seen: CheckpointSelection[] = [];
+    const { adapter, map } = await readyAdapter({
+      onCheckpointSelect: (selection) => seen.push(selection),
+    });
+    adapter.setRoutes(LINES, POINTS);
+    const handler = map.handlers.find(
+      (entry) => entry.event === 'click' && entry.layer === 'trucksafe-checkpoints',
+    )?.fn as ((event: unknown) => void) | undefined;
+    handler?.({
+      features: [
+        {
+          properties: { checkpointId: 'cp-1', routeId: 'route-1' },
+          geometry: { coordinates: [-87.63, 41.88] },
+        },
+      ],
+    });
+    expect(seen).toEqual([{ routeId: 'route-1', checkpointId: 'cp-1' }]);
+    // Public popup API never throws with caller-built text.
+    adapter.showPopup([-87.63, 41.88], 'Checkpoint 1 · Low risk');
+    adapter.closePopup();
+    adapter.destroy();
+  });
+
+  it('reports heat-cell picks with coordinates', async () => {
+    const seen: Array<{ cellId: string; at: unknown }> = [];
+    const { adapter, map } = await readyAdapter({
+      onHeatCellSelect: (cellId, at) => seen.push({ cellId, at }),
+    });
+    adapter.setRoutes(LINES, POINTS);
+    adapter.setHeatmap({
+      cells: [
+        {
+          cellId: 'cell-1',
+          longitude: -87.0,
+          latitude: 41.0,
+          risk: 'HIGH',
+          riskScore: 3,
+          riskReasons: ['wind 38 mph'],
+          windMph: 38,
+          rainInchesPerHour: 0,
+          snowInchesPerHour: 0,
+        },
+      ],
+      bounds: null,
+      forecastStart: '',
+      forecastEnd: '',
+    });
+    const handler = map.handlers.find(
+      (entry) => entry.event === 'click' && entry.layer === 'trucksafe-heatmap',
+    )?.fn as ((event: unknown) => void) | undefined;
+    handler?.({
+      features: [
+        {
+          properties: { cellId: 'cell-1' },
+          geometry: { coordinates: [-87.0, 41.0] },
+        },
+      ],
+    });
+    expect(seen).toEqual([{ cellId: 'cell-1', at: [-87.0, 41.0] }]);
+    adapter.destroy();
+  });
+
+  it('pans to a picked checkpoint, zooming in only when further out', async () => {
+    const { adapter, map } = await readyAdapter();
+    map.zoom = 5;
+    adapter.focusPoint([-87.63, 41.88]);
+    expect(map.easeToCalls).toEqual([{ center: [-87.63, 41.88], zoom: 10 }]);
+    map.zoom = 12;
+    adapter.focusPoint([-87.63, 41.88]);
+    expect(map.easeToCalls[1]).toEqual({ center: [-87.63, 41.88], zoom: 12 });
+    expect(map.jumpToCalls).toHaveLength(0);
     adapter.destroy();
   });
 
@@ -451,12 +568,15 @@ describe('RouteMapAdapter layers', () => {
     pointClick?.fn({
       features: [
         {
-          properties: { checkpointId: 'cp-1' },
+          properties: { checkpointId: 'cp-1', routeId: 'route-1' },
           geometry: { coordinates: [-87.63, 41.88] },
         },
       ],
     } as never);
-    expect(onCheckpointSelect).toHaveBeenCalledWith('cp-1');
+    expect(onCheckpointSelect).toHaveBeenCalledWith({
+      routeId: 'route-1',
+      checkpointId: 'cp-1',
+    });
     adapter.destroy();
   });
 

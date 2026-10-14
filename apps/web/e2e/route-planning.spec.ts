@@ -13,7 +13,8 @@ import AxeBuilder from '@axe-core/playwright';
 async function fillValidForm(page: Page): Promise<void> {
   await page.getByLabel(/origin/i).fill('Chicago, IL');
   await page.getByLabel(/destination/i).fill('Dallas, TX');
-  await page.getByLabel(/departure date and time/i).fill('2026-10-12T14:30');
+  // Departure ships prefilled with today/now and stays untouched: the
+  // themed picker commits through section editing, not value fills.
   await page.getByLabel(/load weight/i).fill('20000');
 }
 
@@ -49,7 +50,6 @@ test('shows a backend validation error for input the client cannot catch', async
   // length rule, so this reaches the server and returns 400.
   await page.getByLabel(/origin/i).fill('A'.repeat(201));
   await page.getByLabel(/destination/i).fill('Dallas, TX');
-  await page.getByLabel(/departure date and time/i).fill('2026-10-12T14:30');
   await page.getByLabel(/load weight/i).fill('20000');
   await page.getByRole('button', { name: /plan route/i }).click();
 
@@ -102,6 +102,8 @@ test('prefills origin, departure, and load weight in pounds', async ({ page }) =
   await page.goto('/');
   await expect(page.getByLabel(/origin/i)).toHaveValue('Chicago, IL');
   await expect(page.getByLabel(/load weight/i)).toHaveValue('30000');
-  const departure = await page.getByLabel(/departure date and time/i).inputValue();
-  expect(departure).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+  // The mobile picker variant labels the input with the open-picker
+  // prompt, so the stable `#departure` id is the locator here.
+  const departure = await page.locator('#departure').inputValue();
+  expect(departure).toMatch(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/);
 });

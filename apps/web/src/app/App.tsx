@@ -1,5 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Box, CssBaseline, ThemeProvider } from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
 import { useState } from 'react';
 
 import { RoutePlanPage } from '../components/route-plan-page/RoutePlanPage';
@@ -21,21 +23,25 @@ export function App(): React.JSX.Element {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <ErrorBoundary>
-          {/* Map-first shell: one fixed viewport-height layer. The map
+        {/* Themed date/time picker dialogs (the native control cannot
+            use the palette) for the departure field. */}
+        <LocalizationProvider dateAdapter={AdapterDateFns}>
+          <ErrorBoundary>
+            {/* Map-first shell: one fixed viewport-height layer. The map
               fills it; the planning panel floats above it. */}
-          <Box
-            component="main"
-            sx={{
-              position: 'fixed',
-              inset: 0,
-              overflow: 'hidden',
-              bgcolor: 'background.default',
-            }}
-          >
-            <RoutePlanPage />
-          </Box>
-        </ErrorBoundary>
+            <Box
+              component="main"
+              sx={{
+                position: 'fixed',
+                inset: 0,
+                overflow: 'hidden',
+                bgcolor: 'background.default',
+              }}
+            >
+              <RoutePlanPage />
+            </Box>
+          </ErrorBoundary>
+        </LocalizationProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

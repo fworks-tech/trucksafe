@@ -4,6 +4,7 @@ import { Box, IconButton, Typography } from '@mui/material';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { routeLabelsById } from '../../features/route-planning/labels';
+import type { CheckpointSelection } from '../../features/route-map/geo';
 import type { RoutePayload } from '../../features/route-planning/types';
 import { RouteCard } from './RouteCard';
 
@@ -12,6 +13,14 @@ interface RouteComparisonProps {
   recommendedRouteId: string | null;
   selectedRouteId: string | null;
   onSelectRoute: (routeId: string) => void;
+  /** Routes hidden from the map; empty shows all. */
+  hiddenRouteIds?: readonly string[];
+  /** Toggles one route's map visibility. */
+  onToggleRouteVisibility?: (routeId: string) => void;
+  /** Currently map-selected checkpoint, for the checkpoint lists. */
+  selectedCheckpoint?: CheckpointSelection | null;
+  /** Checkpoint rows focus the map. */
+  onSelectCheckpoint?: (selection: CheckpointSelection) => void;
 }
 
 /**
@@ -24,6 +33,10 @@ export function RouteComparison({
   recommendedRouteId,
   selectedRouteId,
   onSelectRoute,
+  hiddenRouteIds = [],
+  onToggleRouteVisibility,
+  selectedCheckpoint = null,
+  onSelectCheckpoint,
 }: RouteComparisonProps): React.JSX.Element {
   const labels = routeLabelsById(routes);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -144,6 +157,10 @@ export function RouteComparison({
               recommended={route.id === recommendedRouteId}
               selected={route.id === selectedRouteId}
               onSelect={onSelectRoute}
+              hidden={hiddenRouteIds.includes(route.id)}
+              onToggleVisibility={onToggleRouteVisibility}
+              selectedCheckpoint={selectedCheckpoint}
+              onSelectCheckpoint={onSelectCheckpoint}
             />
           </Box>
         ))}

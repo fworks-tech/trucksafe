@@ -3,6 +3,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 
 import { useRoutePlanMutation } from '../../features/route-planning/hooks/useRoutePlan';
 import { useWeatherGrid } from '../../features/route-map/useWeatherGrid';
+import type { CheckpointSelection } from '../../features/route-map/geo';
 import {
   DEFAULT_ORIGIN_CITY,
   lookupCityCoordinates,
@@ -45,6 +46,12 @@ export function RoutePlanPage(): React.JSX.Element {
   // Viewing selection shared by the map and the route cards. Derived
   // from the backend recommendation; never stored server-side.
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  // Checkpoint picked in the map or a sidebar list; the map pans to it.
+  // Route-qualified: checkpoint ids repeat across routes.
+  const [selectedCheckpoint, setSelectedCheckpoint] =
+    useState<CheckpointSelection | null>(null);
+  // Routes hidden from the map (cards stay visible); cleared per plan.
+  const [hiddenRouteIds, setHiddenRouteIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'plan' | 'routes'>('plan');
   // Dismissible mock-source notice (sidebar noise); it unmounts with
   // the response on every submit, so dismissal resets per plan.
@@ -53,13 +60,19 @@ export function RoutePlanPage(): React.JSX.Element {
   // after the tour closes so the banner collapses to its restart form.
   const [tourOpen, setTourOpen] = useState(false);
   const [tourRefresh, setTourRefresh] = useState(0);
-  // Origin city driving the pre-plan background map. Unknown free text
-  // keeps the previous viewport (lookup returns null, center is unchanged).
-  const [originCity, setOriginCity] = useState<string>(DEFAULT_ORIGIN_CITY);
+  // City driving the pre-plan background map. Unknown free text keeps
+  // the previous viewport (lookup returns null, focus is unchanged).
+  // Either endpoint field can steer it; the last field naming a known
+  // city wins.
+  const [focusCity, setFocusCity] = useState<string>(DEFAULT_ORIGIN_CITY);
   // Memoized by city name so unrelated re-renders keep a stable
   // reference and never refire the map-focus effect (which would snap
   // back a manually panned viewport).
-  const focusCenter = useMemo(() => lookupCityCoordinates(originCity), [originCity]);
+  const focusCenter = useMemo(() => lookupCityCoordinates(focusCity), [focusCity]);
+
+  const handleFocusCity = useCallback((city: string) => {
+    if (lookupCityCoordinates(city) !== null) setFocusCity(city);
+  }, []);
 
   useEffect(() => {
     return (): void => {
@@ -84,6 +97,8 @@ export function RoutePlanPage(): React.JSX.Element {
     (values: RoutePlanFormValues) => {
       mutation.reset();
       setSelectedRouteId(null);
+      setSelectedCheckpoint(null);
+      setHiddenRouteIds([]);
       setActiveTab('plan');
       void mapChunk();
       abortRef.current?.abort();
@@ -105,6 +120,8 @@ export function RoutePlanPage(): React.JSX.Element {
     abortRef.current?.abort();
     mutation.reset();
     setSelectedRouteId(null);
+    setSelectedCheckpoint(null);
+    setHiddenRouteIds([]);
     setActiveTab('plan');
   }, [mutation]);
 
@@ -127,6 +144,18 @@ export function RoutePlanPage(): React.JSX.Element {
 
   const handleSelectRoute = useCallback((routeId: string) => {
     setSelectedRouteId(routeId);
+  }, []);
+
+  const handleSelectCheckpoint = useCallback((selection: CheckpointSelection | null) => {
+    setSelectedCheckpoint(selection);
+  }, []);
+
+  const handleToggleRouteVisibility = useCallback((routeId: string) => {
+    setHiddenRouteIds((hidden) =>
+      hidden.includes(routeId)
+        ? hidden.filter((id) => id !== routeId)
+        : [...hidden, routeId],
+    );
   }, []);
 
   const error = mutation.error;
@@ -169,11 +198,14 @@ export function RoutePlanPage(): React.JSX.Element {
               response={response}
               selectedRouteId={effectiveSelection}
               onSelectRoute={handleSelectRoute}
+              selectedCheckpoint={selectedCheckpoint}
+              onSelectCheckpoint={handleSelectCheckpoint}
               weatherGrid={forecast.weatherGrid}
+              hiddenRouteIds={hiddenRouteIds}
             />
           </Suspense>
         ) : (
-          <OriginFocusMap center={focusCenter} cityName={originCity} />
+          <OriginFocusMap center={focusCenter} cityName={focusCity} />
         )}
       </Box>
 
@@ -264,7 +296,8 @@ export function RoutePlanPage(): React.JSX.Element {
               onSubmit={handleSubmit}
               isPending={mutation.isPending}
               onCancel={handleCancel}
-              onOriginChange={setOriginCity}
+              onOriginChange={handleFocusCity}
+              onDestinationChange={handleFocusCity}
             />
           </section>
         </Box>
@@ -307,6 +340,10 @@ export function RoutePlanPage(): React.JSX.Element {
                     recommendedRouteId={response.recommended_route_id}
                     selectedRouteId={effectiveSelection}
                     onSelectRoute={handleSelectRoute}
+                    hiddenRouteIds={hiddenRouteIds}
+                    onToggleRouteVisibility={handleToggleRouteVisibility}
+                    selectedCheckpoint={selectedCheckpoint}
+                    onSelectCheckpoint={handleSelectCheckpoint}
                   />
                   <ForecastSection
                     value={forecast.forecastOffset}

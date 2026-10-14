@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseLocalParts, toLocalInputValue, toUtcIso } from './datetime';
+import { parseLocalParts, toLocalDate, toLocalInputValue, toUtcIso } from './datetime';
 
 describe('parseLocalParts', () => {
   it('parses a well-formed datetime-local value', () => {
@@ -85,5 +85,24 @@ describe('toLocalInputValue', () => {
 
   it('zero-pads single-digit components', () => {
     expect(toLocalInputValue(new Date(2026, 0, 5, 8, 7))).toBe('2026-01-05T08:07');
+  });
+});
+
+describe('toLocalDate', () => {
+  it('round-trips through toLocalInputValue', () => {
+    const date = toLocalDate('2026-10-12T14:30');
+    expect(date).toBeInstanceOf(Date);
+    expect(toLocalInputValue(date!)).toBe('2026-10-12T14:30');
+  });
+
+  it('returns null for invalid input', () => {
+    expect(toLocalDate('')).toBeNull();
+    expect(toLocalDate('tomorrow at noon')).toBeNull();
+    expect(toLocalDate('2026-13-12T14:30')).toBeNull();
+  });
+
+  it('rejects overflow dates instead of rolling into the next month', () => {
+    // 30 Feb would otherwise become 2 Mar and display the wrong day.
+    expect(toLocalDate('2026-02-30T10:00')).toBeNull();
   });
 });

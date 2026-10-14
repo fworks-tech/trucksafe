@@ -200,19 +200,25 @@ export function GuidedTour({
 
   return (
     <>
-      <Box
-        aria-hidden="true"
-        sx={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 1300,
-          backgroundColor: 'rgba(8, 15, 30, 0.68)',
-          // Click-through: the dialog guides, but the app stays usable —
-          // the tour itself asks users to expand sections and tabs.
-          pointerEvents: 'none',
-        }}
-      />
-      {rect !== null && (
+      {rect === null ? (
+        // No target (welcome/finale): dim everything behind the centered
+        // dialog.
+        <Box
+          aria-hidden="true"
+          sx={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1300,
+            backgroundColor: 'rgba(8, 15, 30, 0.68)',
+            // Click-through: the dialog guides, but the app stays usable —
+            // the tour itself asks users to expand sections and tabs.
+            pointerEvents: 'none',
+          }}
+        />
+      ) : (
+        // Spotlight cutout: the dim is a spread shadow on the ring
+        // itself, so the highlighted field stays fully bright and
+        // readable instead of sitting under a dark overlay.
         <Box
           aria-hidden="true"
           data-testid="tour-spotlight"
@@ -225,7 +231,8 @@ export function GuidedTour({
             height: rect.height + RING_PAD * 2,
             border: '2px solid #ffffff',
             borderRadius: 3,
-            boxShadow: '0 0 0 4px rgba(28, 70, 102, 0.9), 0 0 24px rgba(0, 0, 0, 0.5)',
+            boxShadow:
+              '0 0 0 4px rgba(28, 70, 102, 0.9), 0 0 0 9999px rgba(8, 15, 30, 0.68)',
             pointerEvents: 'none',
           }}
         />

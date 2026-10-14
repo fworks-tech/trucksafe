@@ -25,14 +25,14 @@ function setScenario(scenario: Scenario, delayMs = 0): void {
 }
 
 async function fillAndSubmit(): Promise<void> {
-  // Origin, departure, and load ship prefilled; clear before typing so
-  // keystrokes do not append to the defaults.
+  // Origin and load ship prefilled; clear before typing so keystrokes
+  // do not append to the defaults. Departure also ships prefilled with
+  // today/now and stays untouched: the themed picker commits through
+  // MUI section editing, which synthetic keystrokes cannot drive.
   const user = userEvent.setup();
   await user.clear(screen.getByLabelText(/^origin/i));
   await user.type(screen.getByLabelText(/^origin/i), 'Chicago, IL');
   await user.type(screen.getByLabelText(/^destination/i), 'Dallas, TX');
-  await user.clear(screen.getByLabelText(/departure date and time/i));
-  await user.type(screen.getByLabelText(/departure date and time/i), '2026-10-12T14:30');
   await user.clear(screen.getByLabelText(/load weight/i));
   await user.type(screen.getByLabelText(/load weight/i), '20000');
   await user.click(screen.getByRole('button', { name: /plan route/i }));

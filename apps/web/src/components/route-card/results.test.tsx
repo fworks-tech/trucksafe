@@ -8,6 +8,7 @@ import {
   makeRoute,
   makeRoutePlan,
 } from '../../features/route-planning/fixtures';
+import type { CheckpointSelection } from '../../features/route-map/geo';
 import { CheckpointList } from './CheckpointList';
 import { RecommendationSummary } from './RecommendationSummary';
 import { RouteCard } from './RouteCard';
@@ -61,6 +62,44 @@ describe('RouteCard', () => {
     );
     expect(screen.getByText('Not eligible')).toBeInTheDocument();
     expect(screen.queryByText('Recommended')).not.toBeInTheDocument();
+  });
+
+  it('focuses the map when a sidebar checkpoint row is picked', async () => {
+    const user = userEvent.setup();
+    const seen: CheckpointSelection[] = [];
+    const route = makeRoute('route-1');
+    renderWithProviders(
+      <RouteCard
+        route={route}
+        label="Route 1"
+        recommended={false}
+        onSelectCheckpoint={(selection) => seen.push(selection)}
+      />,
+    );
+    await user.click(screen.getByText('Checkpoints (3)'));
+    await user.click(screen.getByRole('button', { name: /25\.0 mi/ }));
+    // Route-qualified: the same `cp-N` ids exist on every route.
+    expect(seen).toEqual([
+      { routeId: 'route-1', checkpointId: route.checkpoints[1]!.checkpoint_id },
+    ]);
+  });
+
+  it('marks a hidden route explicitly without losing selection', () => {
+    const plan = makeRoutePlan();
+    renderWithProviders(
+      <RouteComparison
+        routes={plan.routes}
+        recommendedRouteId={plan.recommended_route_id}
+        selectedRouteId="route-1"
+        onSelectRoute={() => {}}
+        hiddenRouteIds={['route-1']}
+        onToggleRouteVisibility={() => {}}
+      />,
+    );
+    const card = document.querySelector('[data-route-id="route-1"]');
+    expect(card?.textContent).toMatch(/Hidden from map/);
+    // Selection stays: hiding never changes the selected route.
+    expect(card?.textContent).toMatch(/Selected/);
   });
 });
 
@@ -128,6 +167,29 @@ describe('RouteComparison', () => {
       />,
     );
     expect(screen.getAllByText('Selected')).toHaveLength(1);
+  });
+
+  it('toggles route visibility without changing selection', async () => {
+    const user = userEvent.setup();
+    const hidden: string[] = [];
+    const plan = makeRoutePlan();
+    const props = (hiddenIds: string[]): React.JSX.Element => (
+      <RouteComparison
+        routes={plan.routes}
+        recommendedRouteId={plan.recommended_route_id}
+        selectedRouteId="route-1"
+        onSelectRoute={() => {}}
+        hiddenRouteIds={hiddenIds}
+        onToggleRouteVisibility={(id) => hidden.push(id)}
+      />
+    );
+    const { rerender } = renderWithProviders(props([]));
+    expect(screen.getAllByRole('button', { name: 'Hide route' })).toHaveLength(3);
+    await user.click(screen.getAllByRole('button', { name: 'Hide route' })[0]!);
+    expect(hidden).toEqual(['route-1']);
+    rerender(props(['route-1']));
+    expect(screen.getAllByRole('button', { name: 'Show route' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Hide route' })).toHaveLength(2);
   });
 });
 

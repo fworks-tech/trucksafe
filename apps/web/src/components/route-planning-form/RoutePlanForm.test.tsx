@@ -36,12 +36,9 @@ describe('RoutePlanForm city autocomplete', () => {
     expect(screen.getByLabelText(/^origin/i)).toHaveValue('Phoenix, AZ');
     await user.clear(screen.getByLabelText(/^destination/i));
     await user.type(screen.getByLabelText(/^destination/i), 'Miami, FL');
-    // Departure and load ship prefilled (today, 30,000 lb); clear before typing.
-    await user.clear(screen.getByLabelText(/departure date and time/i));
-    await user.type(
-      screen.getByLabelText(/departure date and time/i),
-      '2026-10-12T14:30',
-    );
+    // Departure ships prefilled with today/now and stays valid untouched
+    // (the themed picker is driven by MUI; the string bridge it uses is
+    // unit-tested in datetime.test.ts).
     await user.clear(screen.getByLabelText(/load weight/i));
     await user.type(screen.getByLabelText(/load weight/i), '20000');
     await user.click(screen.getByRole('button', { name: /plan route/i }));
@@ -57,7 +54,7 @@ describe('RoutePlanForm city autocomplete', () => {
     const departure = (
       screen.getByLabelText(/departure date and time/i) as HTMLInputElement
     ).value;
-    expect(departure).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    expect(departure).toMatch(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/);
     expect(screen.getByLabelText(/^destination/i)).toHaveValue('');
   });
 

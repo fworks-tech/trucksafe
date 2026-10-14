@@ -13,10 +13,12 @@ import {
   Marker,
   Popup,
   type AddLayerObject,
+  type FilterSpecification,
   type MapLayerMouseEvent,
 } from 'maplibre-gl';
 
 import type {
+  CheckpointSelection,
   LngLat,
   MappableCheckpoint,
   MappableRouteLine,
@@ -56,7 +58,10 @@ export type CheckpointEntry = MappableCheckpoint;
 
 export interface RouteMapCallbacks {
   onRouteSelect?: (routeId: string) => void;
-  onCheckpointSelect?: (checkpointId: string) => void;
+  /** Checkpoint picks carry their route: ids repeat across routes. */
+  onCheckpointSelect?: (selection: CheckpointSelection) => void;
+  /** Heatmap cell pick: details come from the weather grid, not a route. */
+  onHeatCellSelect?: (cellId: string, at: LngLat) => void;
   onRuntimeError?: () => void;
 }
 
@@ -179,6 +184,9 @@ function asExpression<T>(value: unknown): T {
 export class RouteMapAdapter {
   private layersReady = false;
   private lastBounds: MapBounds | null = null;
+  private hiddenRouteIds: string[] = [];
+  private selectedRouteId: string | null = null;
+  private selectedCheckpoint: CheckpointSelection | null = null;
 
   private constructor(
     private readonly map: MapLibreMap,
@@ -242,21 +250,20 @@ export class RouteMapAdapter {
     this.map.on('click', CHECKPOINT_LAYER, (event: MapLayerMouseEvent) => {
       const feature = event.features?.[0];
       const checkpointId = feature?.properties['checkpointId'];
-      if (typeof checkpointId === 'string') {
-        this.callbacks.onCheckpointSelect?.(checkpointId);
-        const coordinates = (feature?.geometry as { coordinates?: LngLat } | undefined)
-          ?.coordinates;
-        if (coordinates !== undefined) this.showPopup(coordinates);
+      const routeId = feature?.properties['routeId'];
+      // Popup content comes from the caller (it owns the payload text);
+      // the adapter only reports the pick.
+      if (typeof checkpointId === 'string' && typeof routeId === 'string') {
+        this.callbacks.onCheckpointSelect?.({ routeId, checkpointId });
       }
     });
     this.map.on('click', HEATMAP_LAYER, (event: MapLayerMouseEvent) => {
       const feature = event.features?.[0];
       const cellId = feature?.properties['cellId'];
-      if (typeof cellId === 'string') {
-        this.callbacks.onCheckpointSelect?.(cellId);
-        const coordinates = (feature?.geometry as { coordinates?: LngLat } | undefined)
-          ?.coordinates;
-        if (coordinates !== undefined) this.showPopup(coordinates);
+      const coordinates = (feature?.geometry as { coordinates?: LngLat } | undefined)
+        ?.coordinates;
+      if (typeof cellId === 'string' && coordinates !== undefined) {
+        this.callbacks.onHeatCellSelect?.(cellId, coordinates);
       }
     });
     this.map.on('error', (event: { error?: { message?: string } }) => {
@@ -500,18 +507,63 @@ export class RouteMapAdapter {
   }
 
   /** Emphasize the selected route and checkpoint without refitting. */
-  setSelected(selectedRouteId: string | null, checkpointId: string | null): void {
+  setSelected(
+    selectedRouteId: string | null,
+    selection: CheckpointSelection | null,
+  ): void {
+    this.selectedRouteId = selectedRouteId;
+    this.selectedCheckpoint = selection;
     if (!this.layersReady) return;
-    this.map.setFilter(ROUTE_SELECTED_LAYER, [
+    this.applySelectionFilters();
+  }
+
+  /** Hide routes (and their checkpoints) without discarding data. */
+  setHiddenRoutes(routeIds: readonly string[]): void {
+    this.hiddenRouteIds = [...routeIds];
+    if (!this.layersReady) return;
+    this.map.setFilter(ROUTE_LINES_LAYER, this.routeVisibilityFilter());
+    this.map.setFilter(CHECKPOINT_LAYER, this.routeVisibilityFilter());
+    this.applySelectionFilters();
+  }
+
+  /** `!in hidden` clause shared by every filtered layer, or null. */
+  private routeVisibilityFilter(): FilterSpecification | null {
+    if (this.hiddenRouteIds.length === 0) return null;
+    return asExpression<FilterSpecification>([
+      '!in',
+      ['get', 'routeId'],
+      ['literal', this.hiddenRouteIds],
+    ]);
+  }
+
+  private applySelectionFilters(): void {
+    const visibility = this.routeVisibilityFilter();
+    const routeSelected = asExpression<FilterSpecification>([
       '==',
       ['get', 'routeId'],
-      selectedRouteId ?? '__none__',
+      this.selectedRouteId ?? '__none__',
     ]);
-    this.map.setFilter(CHECKPOINT_SELECTED_LAYER, [
-      '==',
-      ['get', 'checkpointId'],
-      checkpointId ?? '__none__',
-    ]);
+    const checkpointSelected = asExpression<FilterSpecification>(
+      this.selectedCheckpoint === null
+        ? ['==', ['get', 'checkpointId'], '__none__']
+        : [
+            'all',
+            ['==', ['get', 'routeId'], this.selectedCheckpoint.routeId],
+            ['==', ['get', 'checkpointId'], this.selectedCheckpoint.checkpointId],
+          ],
+    );
+    this.map.setFilter(
+      ROUTE_SELECTED_LAYER,
+      visibility === null
+        ? routeSelected
+        : asExpression<FilterSpecification>(['all', routeSelected, visibility]),
+    );
+    this.map.setFilter(
+      CHECKPOINT_SELECTED_LAYER,
+      visibility === null
+        ? checkpointSelected
+        : asExpression<FilterSpecification>(['all', checkpointSelected, visibility]),
+    );
   }
 
   /** Place origin, destination, and recommendation markers. */
@@ -573,6 +625,17 @@ export class RouteMapAdapter {
     this.map.jumpTo({ center, zoom });
   }
 
+  /** Pan to a checkpoint picked in the map or the sidebar; instant when
+   * the user prefers reduced motion. Zooms in only when further out. */
+  focusPoint(center: LngLat): void {
+    const zoom = Math.max(this.map.getZoom(), 10);
+    if (prefersReducedMotion()) {
+      this.map.jumpTo({ center, zoom });
+    } else {
+      this.map.easeTo({ center, zoom });
+    }
+  }
+
   /** Step zoom in/out for touch users without pinch gestures. */
   zoomBy(direction: 'in' | 'out'): void {
     if (direction === 'in') this.map.zoomIn();
@@ -606,13 +669,20 @@ export class RouteMapAdapter {
     }
   }
 
-  private showPopup(at: LngLat): void {
+  /** Show a plain-text popup; content is built by the caller. */
+  showPopup(at: LngLat, text: string): void {
     this.popup?.remove();
-    // setText keeps provider-derived content as plain text, never HTML.
+    // setText keeps caller-provided content as plain text, never HTML.
     this.popup = new Popup({ closeButton: true, closeOnClick: true })
       .setLngLat(at)
-      .setText('Checkpoint details are listed below the map.')
+      .setText(text)
       .addTo(this.map);
+  }
+
+  /** Close the details popup, if any. */
+  closePopup(): void {
+    this.popup?.remove();
+    this.popup = null;
   }
 
   private upsertSource(

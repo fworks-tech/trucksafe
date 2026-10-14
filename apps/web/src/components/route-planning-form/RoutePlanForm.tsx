@@ -20,6 +20,7 @@ import {
 } from '@mui/material';
 import { Controller, useForm } from 'react-hook-form';
 import { useState } from 'react';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 
 import { US_CITIES, DEFAULT_ORIGIN_CITY } from '../../features/route-planning/cities';
 import {
@@ -27,12 +28,14 @@ import {
   type RoutePlanFormValues,
 } from '../../features/route-planning/schemas';
 import { CHECKPOINT_INTERVALS } from '../../features/route-planning/types';
-import { toLocalInputValue } from '../../lib/datetime';
+import { toLocalDate, toLocalInputValue } from '../../lib/datetime';
 
-/** Accessible quick examples: they only prefill addresses, never submit. */
+/** Accessible quick examples: they only prefill addresses, never submit.
+ * Short labels keep two chips per row; the full pair stays in aria-label.
+ */
 const QUICK_EXAMPLES = [
-  { origin: 'Chicago, IL', destination: 'Dallas, TX' },
-  { origin: 'Phoenix, AZ', destination: 'Denver, CO' },
+  { origin: 'Chicago, IL', destination: 'Dallas, TX', short: 'Chicago → Dallas' },
+  { origin: 'Phoenix, AZ', destination: 'Denver, CO', short: 'Phoenix → Denver' },
 ] as const;
 
 interface RoutePlanFormProps {
@@ -41,6 +44,8 @@ interface RoutePlanFormProps {
   onCancel: () => void;
   /** Fires when the origin text changes so the background map can follow. */
   onOriginChange?: (city: string) => void;
+  /** Fires when the destination text changes so the background map can follow. */
+  onDestinationChange?: (city: string) => void;
 }
 
 /** Route-plan input form. Client validation improves UX; backend is final. */
@@ -49,6 +54,7 @@ export function RoutePlanForm({
   isPending,
   onCancel,
   onOriginChange,
+  onDestinationChange,
 }: RoutePlanFormProps): React.JSX.Element {
   const {
     register,
@@ -78,6 +84,11 @@ export function RoutePlanForm({
     onOriginChange?.(city);
   };
 
+  const notifyDestination = (city: string): void => {
+    setDestinationText(city);
+    onDestinationChange?.(city);
+  };
+
   /** City input with suggestions; free text stays allowed for real geocoding. */
   function cityField(
     name: 'origin' | 'destination',
@@ -88,6 +99,8 @@ export function RoutePlanForm({
     setText: (value: string) => void,
   ): React.JSX.Element {
     const fieldError = errors[name]?.message;
+    // Both endpoint fields steer the pre-plan background map.
+    const notifyMap = name === 'origin' ? onOriginChange : onDestinationChange;
     return (
       <Controller
         name={name}
@@ -101,13 +114,13 @@ export function RoutePlanForm({
             onInputChange={(_event, value) => {
               setText(value);
               field.onChange(value);
-              if (name === 'origin') onOriginChange?.(value);
+              notifyMap?.(value);
             }}
             onChange={(_event, value) => {
               const next = typeof value === 'string' ? value : '';
               setText(next);
               field.onChange(next);
-              if (name === 'origin') onOriginChange?.(next);
+              notifyMap?.(next);
             }}
             onBlur={field.onBlur}
             disabled={isPending}
@@ -154,12 +167,15 @@ export function RoutePlanForm({
                 onClick={() => {
                   setValue('origin', example.origin);
                   setValue('destination', example.destination);
+                  // Destination notifies last so the map lands on it.
                   notifyOrigin(example.origin);
-                  setDestinationText(example.destination);
+                  notifyDestination(example.destination);
                 }}
-                label={`${example.origin} to ${example.destination}`}
+                label={example.short}
+                aria-label={`Use example: ${example.origin} to ${example.destination}`}
                 sx={{
                   flex: '1 1 calc(50% - 4px)',
+                  minWidth: 0,
                   justifyContent: 'center',
                   '& .MuiChip-label': {
                     overflow: 'hidden',
@@ -186,23 +202,46 @@ export function RoutePlanForm({
           destinationText,
           setDestinationText,
         )}
-        <TextField
-          id="departure"
-          data-tour="departure-input"
-          label="Departure date and time"
-          type="datetime-local"
-          disabled={isPending}
-          error={errors.departure !== undefined}
-          helperText={errors.departure?.message ?? 'Interpreted in your local timezone.'}
-          slotProps={{ inputLabel: { shrink: true } }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Schedule fontSize="small" />
-              </InputAdornment>
-            ),
-          }}
-          {...register('departure')}
+        {/* Themed picker dialog (palette-driven); the native
+            datetime-local popup cannot be styled and overflows the panel. */}
+        <Controller
+          name="departure"
+          control={control}
+          render={({ field }) => (
+            <Box data-tour="departure-input">
+              <DateTimePicker
+                label="Departure date and time"
+                value={toLocalDate(field.value)}
+                onChange={(date) => {
+                  field.onChange(
+                    date instanceof Date && !Number.isNaN(date.getTime())
+                      ? toLocalInputValue(date)
+                      : '',
+                  );
+                }}
+                ampm={false}
+                format="dd/MM/yyyy HH:mm"
+                disabled={isPending}
+                slotProps={{
+                  textField: {
+                    id: 'departure',
+                    fullWidth: true,
+                    error: errors.departure !== undefined,
+                    helperText:
+                      errors.departure?.message ?? 'Interpreted in your local timezone.',
+                    onBlur: field.onBlur,
+                    InputProps: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Schedule fontSize="small" />
+                        </InputAdornment>
+                      ),
+                    },
+                  },
+                }}
+              />
+            </Box>
+          )}
         />
         <TextField
           id="loadWeight"

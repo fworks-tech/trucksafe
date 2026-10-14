@@ -79,8 +79,17 @@ def calculate_risk(
 
     final_level = max(weather_levels.values())
 
+    # Reasons carry the observed value, not just the factor name: a bare
+    # "rain" never tells the reader whether it drizzled or poured.
+    measurements = {
+        "wind": f"{weather.wind_mph:g} mph",
+        "rain": f"{weather.rain_inches_per_hour:g} in/h",
+        "snow": f"{weather.snow_inches_per_hour:g} in/h",
+    }
     reasons = {
-        condition for condition, level in weather_levels.items() if level == final_level
+        f"{condition} {measurements[condition]}"
+        for condition, level in weather_levels.items()
+        if level == final_level
     }
 
     if weather.wind_mph >= 55:

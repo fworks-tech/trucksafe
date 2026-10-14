@@ -50,15 +50,11 @@ describe('accessibility', () => {
     server.use(routePlansHandler('success'));
     const user = userEvent.setup();
     const { container } = renderWithProviders(<App />);
-    // Origin, departure, and load ship prefilled; clear before typing.
+    // Origin and load ship prefilled; clear before typing. Departure
+    // ships prefilled with today/now and stays untouched.
     await user.clear(screen.getByLabelText(/^origin/i));
     await user.type(screen.getByLabelText(/^origin/i), 'Chicago, IL');
     await user.type(screen.getByLabelText(/^destination/i), 'Dallas, TX');
-    await user.clear(screen.getByLabelText(/departure date and time/i));
-    await user.type(
-      screen.getByLabelText(/departure date and time/i),
-      '2026-10-12T14:30',
-    );
     await user.clear(screen.getByLabelText(/load weight/i));
     await user.type(screen.getByLabelText(/load weight/i), '20000');
     await user.click(screen.getByRole('button', { name: /plan route/i }));
@@ -73,11 +69,6 @@ describe('accessibility', () => {
     await user.clear(screen.getByLabelText(/^origin/i));
     await user.type(screen.getByLabelText(/^origin/i), 'Chicago, IL');
     await user.type(screen.getByLabelText(/^destination/i), 'Dallas, TX');
-    await user.clear(screen.getByLabelText(/departure date and time/i));
-    await user.type(
-      screen.getByLabelText(/departure date and time/i),
-      '2026-10-12T14:30',
-    );
     await user.clear(screen.getByLabelText(/load weight/i));
     await user.type(screen.getByLabelText(/load weight/i), '20000');
     await user.click(screen.getByRole('button', { name: /plan route/i }));

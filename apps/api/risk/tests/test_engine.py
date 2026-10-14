@@ -131,7 +131,7 @@ def test_highest_weather_severity_wins() -> None:
     )
 
     assert result.level == RiskLevel.NO_TRAVEL
-    assert "rain" in result.reasons
+    assert "rain 1.1 in/h" in result.reasons
 
 
 def test_multiple_conditions_with_same_highest_level_are_preserved() -> None:
@@ -149,8 +149,8 @@ def test_multiple_conditions_with_same_highest_level_are_preserved() -> None:
     )
 
     assert result.level == RiskLevel.HIGH
-    assert "rain" in result.reasons
-    assert "wind" in result.reasons
+    assert "rain 0.3 in/h" in result.reasons
+    assert "wind 35 mph" in result.reasons
 
 
 def test_negative_load_weight_is_rejected() -> None:
